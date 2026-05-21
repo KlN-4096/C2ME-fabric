@@ -182,6 +182,12 @@ public class RangeChoiceNode implements AstNode {
         }
     }
 
+    public AstNode getInput() { return input; }
+    public double getMinInclusive() { return minInclusive; }
+    public double getMaxExclusive() { return maxExclusive; }
+    public AstNode getWhenInRange() { return whenInRange; }
+    public AstNode getWhenOutOfRange() { return whenOutOfRange; }
+
     @Override
     public AstNode[] getChildren() {
         return new AstNode[]{this.input, this.whenInRange, this.whenOutOfRange};

@@ -64,6 +64,14 @@ public abstract class AbstractBinaryNode implements AstNode {
 
     protected abstract AstNode newInstance(AstNode left, AstNode right);
 
+    public AstNode getLeft() {
+        return left;
+    }
+
+    public AstNode getRight() {
+        return right;
+    }
+
     @Override
     public AstNode transform(AstTransformer transformer) {
         AstNode left = this.left.transform(transformer);
@@ -79,7 +87,7 @@ public abstract class AbstractBinaryNode implements AstNode {
     public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
         String leftMethod = context.newSingleMethod(this.left);
         String rightMethod = context.newSingleMethod(this.right);
-
+        
         context.callDelegateSingle(m, leftMethod);
         context.callDelegateSingle(m, rightMethod);
     }

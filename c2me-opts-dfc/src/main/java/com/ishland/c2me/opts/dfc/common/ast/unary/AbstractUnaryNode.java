@@ -58,6 +58,10 @@ public abstract class AbstractUnaryNode implements AstNode {
 
     protected abstract AstNode newInstance(AstNode operand);
 
+    public AstNode getOperand() {
+        return operand;
+    }
+
     @Override
     public AstNode transform(AstTransformer transformer) {
         AstNode operand = this.operand.transform(transformer);
@@ -70,8 +74,12 @@ public abstract class AbstractUnaryNode implements AstNode {
 
     @Override
     public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
-        String operandMethod = context.newSingleMethod(this.operand);
-        context.callDelegateSingle(m, operandMethod);
+        if (context.shouldInlineSingle(this.operand)) {
+            this.operand.doBytecodeGenSingle(context, m, localVarConsumer);
+        } else {
+            String operandMethod = context.newSingleMethod(this.operand);
+            context.callDelegateSingle(m, operandMethod);
+        }
     }
 
     @Override

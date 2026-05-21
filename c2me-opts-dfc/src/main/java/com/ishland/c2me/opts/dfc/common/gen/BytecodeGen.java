@@ -1,6 +1,7 @@
 package com.ishland.c2me.opts.dfc.common.gen;
 
 import com.ishland.c2me.opts.dfc.common.ast.AstNode;
+import com.ishland.c2me.opts.dfc.common.ast.AstOptimizer;
 import com.ishland.c2me.opts.dfc.common.ast.EvalType;
 import com.ishland.c2me.opts.dfc.common.ast.McToAst;
 import com.ishland.c2me.opts.dfc.common.ast.dfvisitor.StripBlending;
@@ -80,6 +81,7 @@ public class BytecodeGen {
             return new CompiledDensityFunction(compile0(ast), vif.getBlendingFallback());
         }
         AstNode ast = McToAst.toAst(densityFunction.apply(StripBlending.INSTANCE));
+        ast = AstOptimizer.optimize(ast);
         if (ast instanceof ConstantNode constantNode) {
             return DensityFunctionTypes.constant(constantNode.getValue());
         }
@@ -327,7 +329,7 @@ public class BytecodeGen {
             this.className = Objects.requireNonNull(className);
             this.classDesc = String.format("L%s;", this.className);
         }
-
+        
         public String nextMethodName() {
             return String.format("method_%d", methodIdx++);
         }

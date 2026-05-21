@@ -16,6 +16,10 @@ public class NegMulNode extends AbstractUnaryNode {
         this.negMul = negMul;
     }
 
+    public double getNegMul() {
+        return negMul;
+    }
+
     @Override
     protected AstNode newInstance(AstNode operand) {
         return new NegMulNode(operand, this.negMul);
