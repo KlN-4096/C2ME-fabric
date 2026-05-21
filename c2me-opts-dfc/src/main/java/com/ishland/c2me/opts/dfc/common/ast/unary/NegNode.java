@@ -1,12 +1,13 @@
 package com.ishland.c2me.opts.dfc.common.ast.unary;
 
 import com.ishland.c2me.opts.dfc.common.ast.AstNode;
+import com.ishland.c2me.opts.dfc.common.ast.IInlineableAstNode;
 import com.ishland.c2me.opts.dfc.common.ast.EvalType;
 import com.ishland.c2me.opts.dfc.common.gen.BytecodeGen;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.InstructionAdapter;
 
-public class NegNode extends AbstractUnaryNode {
+public class NegNode extends AbstractUnaryNode implements IInlineableAstNode {
 
     public NegNode(AstNode operand) {
         super(operand);
@@ -31,9 +32,14 @@ public class NegNode extends AbstractUnaryNode {
     }
 
     @Override
-    public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
-        super.doBytecodeGenSingle(context, m, localVarConsumer);
+    public void emitValueSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
+        operandCallByteCodeGen(this.operand, context, m, localVarConsumer);
         m.neg(Type.DOUBLE_TYPE);
+    }
+
+    @Override
+    public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
+        emitValueSingle(context, m, localVarConsumer);
         m.areturn(Type.DOUBLE_TYPE);
     }
 

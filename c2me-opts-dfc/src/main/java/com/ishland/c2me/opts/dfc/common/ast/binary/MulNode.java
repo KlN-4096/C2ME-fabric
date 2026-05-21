@@ -1,13 +1,14 @@
 package com.ishland.c2me.opts.dfc.common.ast.binary;
 
 import com.ishland.c2me.opts.dfc.common.ast.AstNode;
+import com.ishland.c2me.opts.dfc.common.ast.IInlineableAstNode;
 import com.ishland.c2me.opts.dfc.common.ast.EvalType;
 import com.ishland.c2me.opts.dfc.common.gen.BytecodeGen;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.InstructionAdapter;
 
-public class MulNode extends AbstractBinaryNode {
+public class MulNode extends AbstractBinaryNode implements IInlineableAstNode {
 
     public MulNode(AstNode left, AstNode right) {
         super(left, right);
@@ -33,23 +34,28 @@ public class MulNode extends AbstractBinaryNode {
     }
 
     @Override
-    public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
-        String leftMethod = context.newSingleMethod(this.left);
-        String rightMethod = context.newSingleMethod(this.right);
-
+    public void emitValueSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
         Label notZero = new Label();
+        Label end = new Label();
 
-        context.callDelegateSingle(m, leftMethod);
+        operandCallByteCodeGen(this.left, context, m, localVarConsumer);
         m.dup2();
         m.dconst(0.0);
         m.cmpl(Type.DOUBLE_TYPE);
         m.ifne(notZero);
+        m.pop2();
         m.dconst(0.0);
-        m.areturn(Type.DOUBLE_TYPE);
+        m.goTo(end);
 
         m.visitLabel(notZero);
-        context.callDelegateSingle(m, rightMethod);
+        operandCallByteCodeGen(this.right, context, m, localVarConsumer);
         m.mul(Type.DOUBLE_TYPE);
+        m.visitLabel(end);
+    }
+
+    @Override
+    public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
+        emitValueSingle(context, m, localVarConsumer);
         m.areturn(Type.DOUBLE_TYPE);
     }
 

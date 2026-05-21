@@ -3,13 +3,14 @@ package com.ishland.c2me.opts.dfc.common.ast.misc;
 import com.ishland.c2me.opts.dfc.common.ast.AstTransformer;
 import com.ishland.c2me.opts.dfc.common.ast.AstNode;
 import com.ishland.c2me.opts.dfc.common.ast.EvalType;
+import com.ishland.c2me.opts.dfc.common.ast.IInlineableAstNode;
 import com.ishland.c2me.opts.dfc.common.gen.BytecodeGen;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.InstructionAdapter;
 
 import java.util.Arrays;
 
-public class ConstantNode implements AstNode {
+public class ConstantNode implements AstNode, IInlineableAstNode {
 
     private final double value;
 
@@ -38,8 +39,13 @@ public class ConstantNode implements AstNode {
     }
 
     @Override
-    public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
+    public void emitValueSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
         m.dconst(this.value);
+    }
+
+    @Override
+    public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
+        emitValueSingle(context, m, localVarConsumer);
         m.areturn(Type.DOUBLE_TYPE);
     }
 

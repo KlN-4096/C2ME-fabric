@@ -1,13 +1,14 @@
 package com.ishland.c2me.opts.dfc.common.ast.unary;
 
 import com.ishland.c2me.opts.dfc.common.ast.AstNode;
+import com.ishland.c2me.opts.dfc.common.ast.IInlineableAstNode;
 import com.ishland.c2me.opts.dfc.common.ast.EvalType;
 import com.ishland.c2me.opts.dfc.common.gen.BytecodeGen;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.InstructionAdapter;
 
-public class NegMulNode extends AbstractUnaryNode {
+public class NegMulNode extends AbstractUnaryNode implements IInlineableAstNode {
 
     private final double negMul;
 
@@ -41,8 +42,8 @@ public class NegMulNode extends AbstractUnaryNode {
     }
 
     @Override
-    public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
-        super.doBytecodeGenSingle(context, m, localVarConsumer);
+    public void emitValueSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
+        operandCallByteCodeGen(this.operand, context, m, localVarConsumer);
         int v = localVarConsumer.createLocalVariable("v", Type.DOUBLE_TYPE.getDescriptor());
         m.store(v, Type.DOUBLE_TYPE);
 
@@ -60,6 +61,11 @@ public class NegMulNode extends AbstractUnaryNode {
         m.dconst(this.negMul);
         m.mul(Type.DOUBLE_TYPE);
         m.visitLabel(end);
+    }
+
+    @Override
+    public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
+        emitValueSingle(context, m, localVarConsumer);
         m.areturn(Type.DOUBLE_TYPE);
     }
 

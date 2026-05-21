@@ -1,12 +1,13 @@
 package com.ishland.c2me.opts.dfc.common.ast.unary;
 
 import com.ishland.c2me.opts.dfc.common.ast.AstNode;
+import com.ishland.c2me.opts.dfc.common.ast.IInlineableAstNode;
 import com.ishland.c2me.opts.dfc.common.ast.EvalType;
 import com.ishland.c2me.opts.dfc.common.gen.BytecodeGen;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.InstructionAdapter;
 
-public class AbsNode extends AbstractUnaryNode {
+public class AbsNode extends AbstractUnaryNode implements IInlineableAstNode {
 
     public AbsNode(AstNode operand) {
         super(operand);
@@ -31,14 +32,19 @@ public class AbsNode extends AbstractUnaryNode {
     }
 
     @Override
-    public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
-        super.doBytecodeGenSingle(context, m, localVarConsumer);
+    public void emitValueSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
+        operandCallByteCodeGen(this.operand, context, m, localVarConsumer);
         m.invokestatic(
                 Type.getInternalName(Math.class),
                 "abs",
                 Type.getMethodDescriptor(Type.DOUBLE_TYPE, Type.DOUBLE_TYPE),
                 false
         );
+    }
+
+    @Override
+    public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
+        emitValueSingle(context, m, localVarConsumer);
         m.areturn(Type.DOUBLE_TYPE);
     }
 

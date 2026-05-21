@@ -2,6 +2,7 @@ package com.ishland.c2me.opts.dfc.common.ast.unary;
 
 import com.ishland.c2me.opts.dfc.common.ast.AstTransformer;
 import com.ishland.c2me.opts.dfc.common.ast.AstNode;
+import com.ishland.c2me.opts.dfc.common.ast.IInlineableAstNode;
 import com.ishland.c2me.opts.dfc.common.gen.BytecodeGen;
 import org.objectweb.asm.commons.InstructionAdapter;
 
@@ -69,16 +70,6 @@ public abstract class AbstractUnaryNode implements AstNode {
             return transformer.transform(this);
         } else {
             return transformer.transform(newInstance(operand));
-        }
-    }
-
-    @Override
-    public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
-        if (context.shouldInlineSingle(this.operand)) {
-            this.operand.doBytecodeGenSingle(context, m, localVarConsumer);
-        } else {
-            String operandMethod = context.newSingleMethod(this.operand);
-            context.callDelegateSingle(m, operandMethod);
         }
     }
 
