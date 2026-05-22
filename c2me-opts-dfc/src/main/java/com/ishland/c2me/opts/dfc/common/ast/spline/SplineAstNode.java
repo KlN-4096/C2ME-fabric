@@ -1,6 +1,7 @@
 package com.ishland.c2me.opts.dfc.common.ast.spline;
 
 import com.ishland.c2me.opts.dfc.common.ast.AstNode;
+import com.ishland.c2me.opts.dfc.common.ast.IInlineableAstNode;
 import com.ishland.c2me.opts.dfc.common.ast.AstTransformer;
 import com.ishland.c2me.opts.dfc.common.ast.EvalType;
 import com.ishland.c2me.opts.dfc.common.ast.McToAst;
@@ -23,7 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class SplineAstNode implements AstNode {
+public class SplineAstNode implements AstNode, IInlineableAstNode {
 
     public static final String SPLINE_METHOD_DESC = Type.getMethodDescriptor(Type.getType(float.class), Type.getType(int.class), Type.getType(int.class), Type.getType(int.class), Type.getType(EvalType.class));
     private final Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> spline;
@@ -55,10 +56,15 @@ public class SplineAstNode implements AstNode {
     }
 
     @Override
-    public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
+    public void emitValueSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
         ValuesMethodDef splineMethod = doBytecodeGenSpline(context, this.spline);
         callSplineSingle(context, m, splineMethod);
         m.cast(Type.FLOAT_TYPE, Type.DOUBLE_TYPE);
+    }
+
+    @Override
+    public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
+        emitValueSingle(context, m, localVarConsumer);
         m.areturn(Type.DOUBLE_TYPE);
     }
 
@@ -108,6 +114,8 @@ public class SplineAstNode implements AstNode {
 
             int point = localVarConsumer.createLocalVariable("point", Type.FLOAT_TYPE.getDescriptor());
             int rangeForLocation = localVarConsumer.createLocalVariable("rangeForLocation", Type.INT_TYPE.getDescriptor());
+            int locArr = localVarConsumer.createLocalVariable("locArr", Type.getDescriptor(float[].class));
+            int derArr = localVarConsumer.createLocalVariable("derArr", Type.getDescriptor(float[].class));
 
             int lastConst = impl.locations().length - 1;
 
@@ -116,21 +124,19 @@ public class SplineAstNode implements AstNode {
             m.cast(Type.DOUBLE_TYPE, Type.FLOAT_TYPE);
             m.store(point, Type.FLOAT_TYPE);
 
+            m.load(0, InstructionAdapter.OBJECT_TYPE);
+            m.getfield(context.className, locations, Type.getDescriptor(float[].class));
+            m.store(locArr, InstructionAdapter.OBJECT_TYPE);
+
+            m.load(0, InstructionAdapter.OBJECT_TYPE);
+            m.getfield(context.className, derivatives, Type.getDescriptor(float[].class));
+            m.store(derArr, InstructionAdapter.OBJECT_TYPE);
+
             if (valuesMethods.length == 1) {
                 m.load(point, Type.FLOAT_TYPE);
-                m.load(0, InstructionAdapter.OBJECT_TYPE);
-                m.getfield(
-                        context.className,
-                        locations,
-                        Type.getDescriptor(float[].class)
-                );
+                m.load(locArr, InstructionAdapter.OBJECT_TYPE);
                 callSplineSingle(context, m, valuesMethods[0]);
-                m.load(0, InstructionAdapter.OBJECT_TYPE);
-                m.getfield(
-                        context.className,
-                        derivatives,
-                        Type.getDescriptor(float[].class)
-                );
+                m.load(derArr, InstructionAdapter.OBJECT_TYPE);
                 m.iconst(0);
                 m.invokestatic(
                         Type.getInternalName(SplineSupport.class),
@@ -140,12 +146,7 @@ public class SplineAstNode implements AstNode {
                 );
                 m.areturn(Type.FLOAT_TYPE);
             } else {
-                m.load(0, InstructionAdapter.OBJECT_TYPE);
-                m.getfield(
-                        context.className,
-                        locations,
-                        Type.getDescriptor(float[].class)
-                );
+                m.load(locArr, InstructionAdapter.OBJECT_TYPE);
                 m.load(point, Type.FLOAT_TYPE);
                 m.invokestatic(
                         Type.getInternalName(SplineSupport.class),
@@ -162,19 +163,9 @@ public class SplineAstNode implements AstNode {
                 m.ifge(label1);
                 // rangeForLocation < 0
                 m.load(point, Type.FLOAT_TYPE);
-                m.load(0, InstructionAdapter.OBJECT_TYPE);
-                m.getfield(
-                        context.className,
-                        locations,
-                        Type.getDescriptor(float[].class)
-                );
+                m.load(locArr, InstructionAdapter.OBJECT_TYPE);
                 callSplineSingle(context, m, valuesMethods[0]);
-                m.load(0, InstructionAdapter.OBJECT_TYPE);
-                m.getfield(
-                        context.className,
-                        derivatives,
-                        Type.getDescriptor(float[].class)
-                );
+                m.load(derArr, InstructionAdapter.OBJECT_TYPE);
                 m.iconst(0);
                 m.invokestatic(
                         Type.getInternalName(SplineSupport.class),
@@ -190,19 +181,9 @@ public class SplineAstNode implements AstNode {
                 m.ificmpne(label2);
                 // rangeForLocation == last
                 m.load(point, Type.FLOAT_TYPE);
-                m.load(0, InstructionAdapter.OBJECT_TYPE);
-                m.getfield(
-                        context.className,
-                        locations,
-                        Type.getDescriptor(float[].class)
-                );
+                m.load(locArr, InstructionAdapter.OBJECT_TYPE);
                 callSplineSingle(context, m, valuesMethods[lastConst]);
-                m.load(0, InstructionAdapter.OBJECT_TYPE);
-                m.getfield(
-                        context.className,
-                        derivatives,
-                        Type.getDescriptor(float[].class)
-                );
+                m.load(derArr, InstructionAdapter.OBJECT_TYPE);
                 m.iconst(lastConst);
                 m.invokestatic(
                         Type.getInternalName(SplineSupport.class),
@@ -224,22 +205,12 @@ public class SplineAstNode implements AstNode {
                 int p = localVarConsumer.createLocalVariable("p", Type.FLOAT_TYPE.getDescriptor());
                 int q = localVarConsumer.createLocalVariable("q", Type.FLOAT_TYPE.getDescriptor());
 
-                m.load(0, InstructionAdapter.OBJECT_TYPE);
-                m.getfield(
-                        context.className,
-                        locations,
-                        Type.getDescriptor(float[].class)
-                );
+                m.load(locArr, InstructionAdapter.OBJECT_TYPE);
                 m.load(rangeForLocation, Type.INT_TYPE);
                 m.aload(Type.FLOAT_TYPE);
                 m.store(loc0, Type.FLOAT_TYPE);
 
-                m.load(0, InstructionAdapter.OBJECT_TYPE);
-                m.getfield(
-                        context.className,
-                        locations,
-                        Type.getDescriptor(float[].class)
-                );
+                m.load(locArr, InstructionAdapter.OBJECT_TYPE);
                 m.load(rangeForLocation, Type.INT_TYPE);
                 m.iconst(1);
                 m.add(Type.INT_TYPE);
@@ -316,12 +287,7 @@ public class SplineAstNode implements AstNode {
                 m.sub(Type.FLOAT_TYPE);
                 m.store(onDist, Type.FLOAT_TYPE);
 
-                m.load(0, InstructionAdapter.OBJECT_TYPE);
-                m.getfield(
-                        context.className,
-                        derivatives,
-                        Type.getDescriptor(float[].class)
-                );
+                m.load(derArr, InstructionAdapter.OBJECT_TYPE);
                 m.load(rangeForLocation, Type.INT_TYPE);
                 m.aload(Type.FLOAT_TYPE);
                 m.load(locDist, Type.FLOAT_TYPE);
@@ -330,12 +296,7 @@ public class SplineAstNode implements AstNode {
                 m.sub(Type.FLOAT_TYPE);
                 m.store(p, Type.FLOAT_TYPE);
 
-                m.load(0, InstructionAdapter.OBJECT_TYPE);
-                m.getfield(
-                        context.className,
-                        derivatives,
-                        Type.getDescriptor(float[].class)
-                );
+                m.load(derArr, InstructionAdapter.OBJECT_TYPE);
                 m.load(rangeForLocation, Type.INT_TYPE);
                 m.iconst(1);
                 m.add(Type.INT_TYPE);
@@ -347,15 +308,12 @@ public class SplineAstNode implements AstNode {
                 m.add(Type.FLOAT_TYPE);
                 m.store(q, Type.FLOAT_TYPE);
 
+                // lerp(k, n, o) inlined as k*onDist+n, saving one invokestatic
                 m.load(k, Type.FLOAT_TYPE);
+                m.load(onDist, Type.FLOAT_TYPE);
+                m.mul(Type.FLOAT_TYPE);
                 m.load(n, Type.FLOAT_TYPE);
-                m.load(o, Type.FLOAT_TYPE);
-                m.invokestatic(
-                        Type.getInternalName(MathHelper.class),
-                        FabricLoader.getInstance().getMappingResolver().mapMethodName("intermediary", "net.minecraft.class_3532", "method_16439", "(FFF)F"),
-                        "(FFF)F",
-                        false
-                );
+                m.add(Type.FLOAT_TYPE);
                 m.load(k, Type.FLOAT_TYPE);
                 m.fconst(1.0F);
                 m.load(k, Type.FLOAT_TYPE);
