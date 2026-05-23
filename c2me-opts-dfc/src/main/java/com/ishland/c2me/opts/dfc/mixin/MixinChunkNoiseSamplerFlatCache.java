@@ -73,4 +73,9 @@ public abstract class MixinChunkNoiseSamplerFlatCache implements IFastCacheLike 
         this.delegate = delegate;
         return this;
     }
+
+    @Override
+    public String c2me$getName() {
+        return "Flat";
+    }
 }

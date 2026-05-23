@@ -85,7 +85,7 @@ public class McToAst {
 //                if ((Object) f instanceof IFastCacheLike fastCacheLike && f.type() != DensityFunctionTypes.Wrapping.Type.INTERPOLATED) {
 //                    yield new CacheLikeNode(fastCacheLike, toAst(fastCacheLike.c2me$getDelegate()));
 //                }
-                DensityFunctionTypes.Wrapping wrapping = new DensityFunctionTypes.Wrapping(f.type(), new CompiledDensityFunction(BytecodeGen.compile0(toAst(f.wrapped())), null));
+                DensityFunctionTypes.Wrapping wrapping = new DensityFunctionTypes.Wrapping(f.type(), new CompiledDensityFunction(BytecodeGen.compile0(toAst(f.wrapped()), "Wrapped"), null));
                 ((IEqualityOverriding) (Object) wrapping).c2me$overrideEquality(f);
                 yield new DelegateNode(wrapping);
             }

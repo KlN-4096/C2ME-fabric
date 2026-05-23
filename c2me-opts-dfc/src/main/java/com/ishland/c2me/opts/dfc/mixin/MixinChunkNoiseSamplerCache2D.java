@@ -13,12 +13,16 @@ import org.spongepowered.asm.mixin.Shadow;
 @Mixin(ChunkNoiseSampler.Cache2D.class)
 public abstract class MixinChunkNoiseSamplerCache2D implements IFastCacheLike {
 
-    @Shadow private long lastSamplingColumnPos;
+    @Shadow
+    private long lastSamplingColumnPos;
 
-    @Shadow private double lastSamplingResult;
+    @Shadow
+    private double lastSamplingResult;
 
     @Mutable
-    @Shadow @Final private DensityFunction delegate;
+    @Shadow
+    @Final
+    private DensityFunction delegate;
 
     @Override
     public double c2me$getCached(int x, int y, int z, EvalType evalType) {
@@ -55,5 +59,10 @@ public abstract class MixinChunkNoiseSamplerCache2D implements IFastCacheLike {
     public DensityFunction c2me$withDelegate(DensityFunction delegate) {
         this.delegate = delegate;
         return this;
+    }
+
+    @Override
+    public String c2me$getName() {
+        return "2D";
     }
 }

@@ -20,39 +20,43 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class MixinNoiseConfig {
 
     @Mutable
-    @Shadow @Final private NoiseRouter noiseRouter;
+    @Shadow
+    @Final
+    private NoiseRouter noiseRouter;
 
     @Mutable
-    @Shadow @Final private MultiNoiseUtil.MultiNoiseSampler multiNoiseSampler;
+    @Shadow
+    @Final
+    private MultiNoiseUtil.MultiNoiseSampler multiNoiseSampler;
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void postCreate(CallbackInfo ci) {
         Stopwatch stopwatch = Stopwatch.createStarted();
         Reference2ReferenceMap<DensityFunction, DensityFunction> tempCache = new Reference2ReferenceOpenHashMap<>();
         this.noiseRouter = new NoiseRouter(
-                BytecodeGen.compile(this.noiseRouter.barrierNoise(), tempCache),
-                BytecodeGen.compile(this.noiseRouter.fluidLevelFloodednessNoise(), tempCache),
-                BytecodeGen.compile(this.noiseRouter.fluidLevelSpreadNoise(), tempCache),
-                BytecodeGen.compile(this.noiseRouter.lavaNoise(), tempCache),
-                BytecodeGen.compile(this.noiseRouter.temperature(), tempCache),
-                BytecodeGen.compile(this.noiseRouter.vegetation(), tempCache),
-                BytecodeGen.compile(this.noiseRouter.continents(), tempCache),
-                BytecodeGen.compile(this.noiseRouter.erosion(), tempCache),
-                BytecodeGen.compile(this.noiseRouter.depth(), tempCache),
-                BytecodeGen.compile(this.noiseRouter.ridges(), tempCache),
-                BytecodeGen.compile(this.noiseRouter.initialDensityWithoutJaggedness(), tempCache),
-                BytecodeGen.compile(this.noiseRouter.finalDensity(), tempCache),
-                BytecodeGen.compile(this.noiseRouter.veinToggle(), tempCache),
-                BytecodeGen.compile(this.noiseRouter.veinRidged(), tempCache),
-                BytecodeGen.compile(this.noiseRouter.veinGap(), tempCache)
+                BytecodeGen.compile(this.noiseRouter.barrierNoise(), "barrierNoise", tempCache),
+                BytecodeGen.compile(this.noiseRouter.fluidLevelFloodednessNoise(), "fluidLevelFloodednessNoise", tempCache),
+                BytecodeGen.compile(this.noiseRouter.fluidLevelSpreadNoise(), "fluidLevelSpreadNoise", tempCache),
+                BytecodeGen.compile(this.noiseRouter.lavaNoise(), "lavaNoise", tempCache),
+                BytecodeGen.compile(this.noiseRouter.temperature(), "temperature", tempCache),
+                BytecodeGen.compile(this.noiseRouter.vegetation(), "vegetation", tempCache),
+                BytecodeGen.compile(this.noiseRouter.continents(), "continents", tempCache),
+                BytecodeGen.compile(this.noiseRouter.erosion(), "erosion", tempCache),
+                BytecodeGen.compile(this.noiseRouter.depth(), "depth", tempCache),
+                BytecodeGen.compile(this.noiseRouter.ridges(), "ridges", tempCache),
+                BytecodeGen.compile(this.noiseRouter.initialDensityWithoutJaggedness(), "initialDensityWithoutJaggedness", tempCache),
+                BytecodeGen.compile(this.noiseRouter.finalDensity(), "finalDensity", tempCache),
+                BytecodeGen.compile(this.noiseRouter.veinToggle(), "veinToggle", tempCache),
+                BytecodeGen.compile(this.noiseRouter.veinRidged(), "veinRidged", tempCache),
+                BytecodeGen.compile(this.noiseRouter.veinGap(), "veinGap", tempCache)
         );
         this.multiNoiseSampler = new MultiNoiseUtil.MultiNoiseSampler(
-                BytecodeGen.compile(this.multiNoiseSampler.temperature(), tempCache),
-                BytecodeGen.compile(this.multiNoiseSampler.humidity(), tempCache),
-                BytecodeGen.compile(this.multiNoiseSampler.continentalness(), tempCache),
-                BytecodeGen.compile(this.multiNoiseSampler.erosion(), tempCache),
-                BytecodeGen.compile(this.multiNoiseSampler.depth(), tempCache),
-                BytecodeGen.compile(this.multiNoiseSampler.weirdness(), tempCache),
+                BytecodeGen.compile(this.multiNoiseSampler.temperature(), "temperature", tempCache),
+                BytecodeGen.compile(this.multiNoiseSampler.humidity(), "humidity", tempCache),
+                BytecodeGen.compile(this.multiNoiseSampler.continentalness(), "continentalness", tempCache),
+                BytecodeGen.compile(this.multiNoiseSampler.erosion(), "erosion", tempCache),
+                BytecodeGen.compile(this.multiNoiseSampler.depth(), "depth", tempCache),
+                BytecodeGen.compile(this.multiNoiseSampler.weirdness(), "weirdness", tempCache),
                 this.multiNoiseSampler.spawnTarget()
         );
         stopwatch.stop();

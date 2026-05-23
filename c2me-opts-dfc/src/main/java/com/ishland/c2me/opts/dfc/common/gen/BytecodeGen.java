@@ -5,6 +5,7 @@ import com.ishland.c2me.opts.dfc.common.ast.AstOptimizer;
 import com.ishland.c2me.opts.dfc.common.ast.EvalType;
 import com.ishland.c2me.opts.dfc.common.ast.McToAst;
 import com.ishland.c2me.opts.dfc.common.ast.dfvisitor.StripBlending;
+import com.ishland.c2me.opts.dfc.common.ast.misc.CacheLikeNode;
 import com.ishland.c2me.opts.dfc.common.ast.misc.ConstantNode;
 import com.ishland.c2me.opts.dfc.common.ast.misc.RootNode;
 import com.ishland.c2me.opts.dfc.common.util.ArrayCache;
@@ -71,30 +72,30 @@ public class BytecodeGen {
     };
     private static final Object2ReferenceMap<AstNode, Class<?>> compilationCache = Object2ReferenceMaps.synchronize(new Object2ReferenceOpenCustomHashMap<>(RELAXED_STRATEGY));
 
-    public static DensityFunction compile(DensityFunction densityFunction, Reference2ReferenceMap<DensityFunction, DensityFunction> tempCache) {
+    public static DensityFunction compile(DensityFunction densityFunction, String rootName, Reference2ReferenceMap<DensityFunction, DensityFunction> tempCache) {
         DensityFunction cached = tempCache.get(densityFunction);
         if (cached != null) {
             return cached;
         }
         if (densityFunction instanceof AstVanillaInterface vif) {
             AstNode ast = vif.getAstNode();
-            return new CompiledDensityFunction(compile0(ast), vif.getBlendingFallback());
+            return new CompiledDensityFunction(compile0(ast, rootName), vif.getBlendingFallback());
         }
         AstNode ast = McToAst.toAst(densityFunction.apply(StripBlending.INSTANCE));
         ast = AstOptimizer.optimize(ast);
         if (ast instanceof ConstantNode constantNode) {
             return DensityFunctionTypes.constant(constantNode.getValue());
         }
-        CompiledDensityFunction compiled = new CompiledDensityFunction(compile0(ast), densityFunction);
+        CompiledDensityFunction compiled = new CompiledDensityFunction(compile0(ast, rootName), densityFunction);
         tempCache.put(densityFunction, compiled);
         return compiled;
     }
 
-    public static synchronized CompiledEntry compile0(AstNode node) {
+    public static synchronized CompiledEntry compile0(AstNode node, String rootName) {
         Class<?> cached = compilationCache.get(node);
 
         ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-        String name = cached != null ? String.format("DfcCompiled_discarded") : String.format("DfcCompiled_%d", ordinal.getAndIncrement());
+        String name = cached != null ? String.format("DfcCompiled_discarded") : String.format("Dfc%s_%d", rootName, ordinal.getAndIncrement());
         writer.visit(Opcodes.V21, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL, name, null, Type.getInternalName(Object.class), new String[]{Type.getInternalName(CompiledEntry.class)});
 
         RootNode rootNode = new RootNode(node);
@@ -496,15 +497,21 @@ public class BytecodeGen {
         }
         
         public String nextMethodName() {
-            return String.format("method_%d", methodIdx++);
+            return String.format("m_%d", methodIdx++);
         }
 
         public String nextMethodName(String suffix) {
-            return String.format("method_%d_%s", methodIdx++, suffix);
+            return String.format("m_%d_%s", methodIdx++, suffix);
         }
 
         public String newSingleMethod(AstNode node) {
-            return this.singleMethods.computeIfAbsent(node, (AstNode node1) -> this.newSingleMethod((adapter, localVarConsumer) -> node1.doBytecodeGenSingle(this, adapter, localVarConsumer), nextMethodName(node.getClass().getSimpleName())));
+            return this.singleMethods.computeIfAbsent(node, (AstNode node1) -> {
+                String suffix = node.getClass().getSimpleName();
+                if (node instanceof CacheLikeNode cacheLikeNode) {
+                    suffix += cacheLikeNode.getCacheLike().c2me$getName();
+                }
+                return this.newSingleMethod((adapter, localVarConsumer) -> node1.doBytecodeGenSingle(this, adapter, localVarConsumer), nextMethodName(suffix));
+            });
         }
 
         public String newSingleMethod(BiConsumer<InstructionAdapter, LocalVarConsumer> generator) {

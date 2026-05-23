@@ -135,4 +135,9 @@ public abstract class MixinChunkNoiseSamplerCacheOnce implements IFastCacheLike 
         this.delegate = delegate;
         return this;
     }
+
+    @Override
+    public String c2me$getName() {
+        return "Once";
+    }
 }

@@ -99,4 +99,9 @@ public abstract class MixinDFTWrapping implements IFastCacheLike, IEqualityOverr
     public DensityFunction apply(DensityFunctionVisitor visitor) {
         return visitor.apply(this.c2me$withDelegate(this.wrapped().apply(visitor)));
     }
+
+    @Override
+    public String c2me$getName() {
+        return "Wrapper";
+    }
 }

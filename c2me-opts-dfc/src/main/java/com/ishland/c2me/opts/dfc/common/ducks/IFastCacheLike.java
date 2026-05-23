@@ -20,4 +20,5 @@ public interface IFastCacheLike extends DensityFunction {
     // called by generated code
     DensityFunction c2me$withDelegate(DensityFunction delegate);
 
+    String c2me$getName();
 }

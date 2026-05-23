@@ -176,4 +176,9 @@ public abstract class MixinChunkNoiseSamplerDensityInterpolator implements IFast
         this.delegate = delegate;
         return this;
     }
+
+    @Override
+    public String c2me$getName() {
+        return "Interpolation";
+    }
 }
