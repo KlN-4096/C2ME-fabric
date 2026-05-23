@@ -34,6 +34,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.ListIterator;
@@ -489,6 +490,7 @@ public class BytecodeGen {
         private final Object2ReferenceOpenHashMap<Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper>, String> splineMethods = new Object2ReferenceOpenHashMap<>();
         private final ObjectOpenHashSet<String> postProcessMethods = new ObjectOpenHashSet<>();
         private final Reference2ObjectOpenHashMap<Object, FieldRecord> args = new Reference2ObjectOpenHashMap<>();
+        private final Object2ReferenceOpenHashMap<FloatArrayKey, FieldRecord> floatArrayArgs = new Object2ReferenceOpenHashMap<>();
 
         public Context(ClassWriter classWriter, String className) {
             this.classWriter = Objects.requireNonNull(classWriter);
@@ -641,6 +643,12 @@ public class BytecodeGen {
         }
 
         public <T> String newField(Class<T> type, T data) {
+            if (type == float[].class) {
+                FieldRecord existing = this.floatArrayArgs.get(new FloatArrayKey((float[]) data));
+                if (existing != null) {
+                    return existing.name();
+                }
+            }
             FieldRecord existing = this.args.get(data);
             if (existing != null) {
                 return existing.name();
@@ -648,7 +656,11 @@ public class BytecodeGen {
             int size = this.args.size();
             String name = String.format("field_%d", size);
             classWriter.visitField(Opcodes.ACC_PRIVATE, name, Type.getDescriptor(type), null, null);
-            this.args.put(data, new FieldRecord(name, size, type));
+            FieldRecord fieldRecord = new FieldRecord(name, size, type);
+            this.args.put(data, fieldRecord);
+            if (type == float[].class) {
+                this.floatArrayArgs.put(new FloatArrayKey((float[]) data), fieldRecord);
+            }
             return name;
         }
 
@@ -744,6 +756,31 @@ public class BytecodeGen {
         }
 
         private static record FieldRecord(String name, int ordinal, Class<?> type) {
+        }
+
+        private static final class FloatArrayKey {
+
+            private final int[] bits;
+            private final int hashCode;
+
+            private FloatArrayKey(float[] array) {
+                this.bits = new int[array.length];
+                for (int i = 0; i < array.length; i++) {
+                    this.bits[i] = Float.floatToRawIntBits(array[i]);
+                }
+                this.hashCode = Arrays.hashCode(this.bits);
+            }
+
+            @Override
+            public boolean equals(Object o) {
+                return this == o || o instanceof FloatArrayKey that && Arrays.equals(this.bits, that.bits);
+            }
+
+            @Override
+            public int hashCode() {
+                return this.hashCode;
+            }
+
         }
     }
 
