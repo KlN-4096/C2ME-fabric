@@ -62,11 +62,23 @@ public class CompiledDensityFunction extends SubCompiledDensityFunction {
             }
         }
 
-        for (ListIterator<Object> iterator = args.listIterator(); iterator.hasNext(); ) {
-            Object next = iterator.next();
+        // Some wrappers, notably ChunkNoiseSampler.FlatCache, eagerly sample their delegate when
+        // materialized. The wrapper delegates stored in this CompiledEntry point at this entry's
+        // current instance, whose child cache fields are still the old inert Wrapping objects.
+        // Walk backwards, and materialize each cache through a raw staging instance built from
+        // the current args so parent FlatCache pre-sampling can see already-materialized children.
+        for (ListIterator<Object> iterator = args.listIterator(args.size()); iterator.hasPrevious(); ) {
+            int index = iterator.previousIndex();
+            Object next = iterator.previous();
             if (next instanceof IFastCacheLike cacheLike) {
-                DensityFunction applied = visitor.apply(cacheLike);
-                if (applied == cacheLike.c2me$getDelegate()) {
+                CompiledEntry stagingEntry = this.compiledEntry.newRawInstance(args);
+                stagingEntry.postProcessField(index);
+                Object stagingNext = stagingEntry.getArgs().get(index);
+                if (!(stagingNext instanceof IFastCacheLike stagingCacheLike)) {
+                    continue;
+                }
+                DensityFunction applied = visitor.apply(stagingCacheLike);
+                if (applied == stagingCacheLike.c2me$getDelegate()) {
                     iterator.set(null); // cache removed
                     modified = true;
                 } else if (applied instanceof IFastCacheLike newCacheLike) {

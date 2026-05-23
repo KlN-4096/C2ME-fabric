@@ -102,6 +102,7 @@ public class BytecodeGen {
         Context genContext = new Context(writer, name);
         genContext.newSingleMethod0((adapter, localVarConsumer) -> rootNode.doBytecodeGenSingle(genContext, adapter, localVarConsumer), "evalSingle", true);
         genContext.newMultiMethod0((adapter, localVarConsumer) -> rootNode.doBytecodeGenMulti(genContext, adapter, localVarConsumer), "evalMulti", true);
+        genPostProcessAll(genContext);
 
         List<Object> args = genContext.args.entrySet().stream()
                 .sorted(Comparator.comparingInt(o -> o.getValue().ordinal()))
@@ -117,8 +118,11 @@ public class BytecodeGen {
         }
 
         genConstructor(genContext);
+        genRawConstructor(genContext);
         genGetArgs(genContext);
         genNewInstance(genContext);
+        genNewRawInstance(genContext);
+        genPostProcessField(genContext);
 //        genFields(genContext);
 
         ListIterator<Object> iterator = args.listIterator();
@@ -162,6 +166,40 @@ public class BytecodeGen {
         m.visitLabel(start);
 
         m.load(0, InstructionAdapter.OBJECT_TYPE);
+        m.load(1, InstructionAdapter.OBJECT_TYPE);
+        m.iconst(1);
+        m.invokespecial(context.className, "<init>", Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(List.class), Type.BOOLEAN_TYPE), false);
+
+        m.areturn(Type.VOID_TYPE);
+        m.visitLabel(end);
+        m.visitLocalVariable("this", context.classDesc, null, start, end, 0);
+        m.visitLocalVariable("list", Type.getDescriptor(List.class), null, start, end, 1);
+        m.visitMaxs(0, 0);
+    }
+
+    private static void genRawConstructor(Context context) {
+        InstructionAdapter m = new InstructionAdapter(
+                new AnalyzerAdapter(
+                        context.className,
+                        Opcodes.ACC_PRIVATE,
+                        "<init>",
+                        Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(List.class), Type.BOOLEAN_TYPE),
+                        context.classWriter.visitMethod(
+                                Opcodes.ACC_PRIVATE,
+                                "<init>",
+                                Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(List.class), Type.BOOLEAN_TYPE),
+                                null,
+                                null
+                        )
+                )
+        );
+
+        Label start = new Label();
+        Label postProcessEnd = new Label();
+        Label end = new Label();
+        m.visitLabel(start);
+
+        m.load(0, InstructionAdapter.OBJECT_TYPE);
         m.invokespecial(Type.getInternalName(Object.class), "<init>", Type.getMethodDescriptor(Type.VOID_TYPE), false);
 
         for (Map.Entry<Object, Context.FieldRecord> entry : context.args.entrySet().stream().sorted(Comparator.comparingInt(o -> o.getValue().ordinal())).toList()) {
@@ -177,15 +215,17 @@ public class BytecodeGen {
             m.putfield(context.className, name, Type.getDescriptor(type));
         }
 
-        for (String postProcessingMethod : context.postProcessMethods.stream().sorted().toList()) {
-            m.load(0, InstructionAdapter.OBJECT_TYPE);
-            m.invokevirtual(context.className, postProcessingMethod, "()V", false);
-        }
+        m.load(2, Type.BOOLEAN_TYPE);
+        m.visitJumpInsn(Opcodes.IFEQ, postProcessEnd);
+        m.load(0, InstructionAdapter.OBJECT_TYPE);
+        m.invokevirtual(context.className, "postProcessAll", "()V", false);
+        m.visitLabel(postProcessEnd);
 
         m.areturn(Type.VOID_TYPE);
         m.visitLabel(end);
         m.visitLocalVariable("this", context.classDesc, null, start, end, 0);
         m.visitLocalVariable("list", Type.getDescriptor(List.class), null, start, end, 1);
+        m.visitLocalVariable("runPostProcessing", Type.BOOLEAN_TYPE.getDescriptor(), null, start, end, 2);
         m.visitMaxs(0, 0);
     }
 
@@ -236,15 +276,23 @@ public class BytecodeGen {
     }
 
     private static void genNewInstance(Context context) {
+        genNewInstanceMethod(context, "newInstance", true);
+    }
+
+    private static void genNewRawInstance(Context context) {
+        genNewInstanceMethod(context, "newRawInstance", false);
+    }
+
+    private static void genNewInstanceMethod(Context context, String methodName, boolean runPostProcessing) {
         InstructionAdapter m = new InstructionAdapter(
                 new AnalyzerAdapter(
                         context.className,
                         Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL,
-                        "newInstance",
+                        methodName,
                         Type.getMethodDescriptor(Type.getType(CompiledEntry.class), Type.getType(List.class)),
                         context.classWriter.visitMethod(
                                 Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL,
-                                "newInstance",
+                                methodName,
                                 Type.getMethodDescriptor(Type.getType(CompiledEntry.class), Type.getType(List.class)),
                                 null,
                                 null
@@ -258,12 +306,129 @@ public class BytecodeGen {
         m.anew(Type.getType(context.classDesc));
         m.dup();
         m.load(1, InstructionAdapter.OBJECT_TYPE);
-        m.invokespecial(context.className, "<init>", Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(List.class)), false);
+        m.iconst(runPostProcessing ? 1 : 0);
+        m.invokespecial(context.className, "<init>", Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(List.class), Type.BOOLEAN_TYPE), false);
         m.areturn(InstructionAdapter.OBJECT_TYPE);
 
         m.visitLabel(end);
         m.visitLocalVariable("this", context.classDesc, null, start, end, 0);
         m.visitLocalVariable("list", Type.getDescriptor(List.class), null, start, end, 1);
+        m.visitMaxs(0, 0);
+    }
+
+    private static void genPostProcessAll(Context context) {
+        List<Context.FieldRecord> postProcessFields = context.getFields().stream()
+                .filter(field -> context.postProcessMethods.contains(String.format("postProcessing_%s", field.name())))
+                .toList();
+        String fieldIndexesField = context.newField(int[].class, postProcessFields.stream().mapToInt(Context.FieldRecord::ordinal).toArray());
+
+        InstructionAdapter m = new InstructionAdapter(
+                new AnalyzerAdapter(
+                        context.className,
+                        Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL,
+                        "postProcessAll",
+                        "()V",
+                        context.classWriter.visitMethod(
+                                Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL,
+                                "postProcessAll",
+                                "()V",
+                                null,
+                                null
+                        )
+                )
+        );
+
+        Label start = new Label();
+        Label loopStart = new Label();
+        Label loopEnd = new Label();
+        Label end = new Label();
+        m.visitLabel(start);
+
+        int indexes = 1;
+        int idx = 2;
+        m.load(0, InstructionAdapter.OBJECT_TYPE);
+        m.getfield(context.className, fieldIndexesField, Type.getDescriptor(int[].class));
+        m.store(indexes, InstructionAdapter.OBJECT_TYPE);
+        m.iconst(0);
+        m.store(idx, Type.INT_TYPE);
+
+        m.visitLabel(loopStart);
+        m.load(idx, Type.INT_TYPE);
+        m.load(indexes, InstructionAdapter.OBJECT_TYPE);
+        m.arraylength();
+        m.ificmpge(loopEnd);
+
+        m.load(0, InstructionAdapter.OBJECT_TYPE);
+        m.load(indexes, InstructionAdapter.OBJECT_TYPE);
+        m.load(idx, Type.INT_TYPE);
+        m.aload(Type.INT_TYPE);
+        m.invokevirtual(context.className, "postProcessField", Type.getMethodDescriptor(Type.VOID_TYPE, Type.INT_TYPE), false);
+        m.iinc(idx, 1);
+        m.goTo(loopStart);
+
+        m.visitLabel(loopEnd);
+        m.areturn(Type.VOID_TYPE);
+        m.visitLabel(end);
+        m.visitLocalVariable("this", context.classDesc, null, start, end, 0);
+        m.visitLocalVariable("indexes", Type.getDescriptor(int[].class), null, start, end, indexes);
+        m.visitLocalVariable("idx", Type.INT_TYPE.getDescriptor(), null, start, end, idx);
+        m.visitMaxs(0, 0);
+    }
+
+    private static void genPostProcessField(Context context) {
+        InstructionAdapter m = new InstructionAdapter(
+                new AnalyzerAdapter(
+                        context.className,
+                        Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL,
+                        "postProcessField",
+                        Type.getMethodDescriptor(Type.VOID_TYPE, Type.INT_TYPE),
+                        context.classWriter.visitMethod(
+                                Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL,
+                                "postProcessField",
+                                Type.getMethodDescriptor(Type.VOID_TYPE, Type.INT_TYPE),
+                                null,
+                                null
+                        )
+                )
+        );
+
+        Label start = new Label();
+        Label end = new Label();
+        m.visitLabel(start);
+
+        List<Context.FieldRecord> postProcessFields = context.getFields().stream()
+                .filter(field -> context.postProcessMethods.contains(String.format("postProcessing_%s", field.name())))
+                .toList();
+
+        if (!postProcessFields.isEmpty()) {
+            Label defaultLabel = new Label();
+            int[] keys = new int[postProcessFields.size()];
+            Label[] labels = new Label[postProcessFields.size()];
+            for (int i = 0; i < postProcessFields.size(); i++) {
+                keys[i] = postProcessFields.get(i).ordinal();
+                labels[i] = new Label();
+            }
+
+            m.load(0, InstructionAdapter.OBJECT_TYPE);
+            m.load(1, Type.INT_TYPE);
+            m.visitLookupSwitchInsn(defaultLabel, keys, labels);
+
+            for (int i = 0; i < postProcessFields.size(); i++) {
+                Context.FieldRecord field = postProcessFields.get(i);
+                String postProcessingMethod = String.format("postProcessing_%s", field.name());
+                m.visitLabel(labels[i]);
+                m.invokevirtual(context.className, postProcessingMethod, "()V", false);
+                m.areturn(Type.VOID_TYPE);
+            }
+
+            m.visitLabel(defaultLabel);
+            m.pop();
+        }
+
+        m.areturn(Type.VOID_TYPE);
+        m.visitLabel(end);
+        m.visitLocalVariable("this", context.classDesc, null, start, end, 0);
+        m.visitLocalVariable("fieldIndex", Type.INT_TYPE.getDescriptor(), null, start, end, 1);
         m.visitMaxs(0, 0);
     }
 
@@ -478,6 +643,12 @@ public class BytecodeGen {
             classWriter.visitField(Opcodes.ACC_PRIVATE, name, Type.getDescriptor(type), null, null);
             this.args.put(data, new FieldRecord(name, size, type));
             return name;
+        }
+
+        private List<FieldRecord> getFields() {
+            List<FieldRecord> fields = new ArrayList<>(this.args.values());
+            fields.sort(Comparator.comparingInt(FieldRecord::ordinal));
+            return fields;
         }
 
         public void doCountedLoop(InstructionAdapter m, LocalVarConsumer localVarConsumer, IntConsumer bodyGenerator) {
