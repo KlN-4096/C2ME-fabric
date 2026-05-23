@@ -33,7 +33,7 @@ public class AbsNode extends AbstractUnaryNode implements IInlineableAstNode {
 
     @Override
     public void emitValueSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
-        operandCallByteCodeGen(this.operand, context, m, localVarConsumer);
+        AstNode.operandCallByteCodeGen(this.operand, context, m, localVarConsumer);
         m.invokestatic(
                 Type.getInternalName(Math.class),
                 "abs",

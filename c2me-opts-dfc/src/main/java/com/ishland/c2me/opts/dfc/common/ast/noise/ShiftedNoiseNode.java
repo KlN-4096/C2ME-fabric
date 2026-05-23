@@ -83,21 +83,21 @@ public class ShiftedNoiseNode implements AstNode {
         m.cast(Type.INT_TYPE, Type.DOUBLE_TYPE);
         m.dconst(this.xzScale);
         m.mul(Type.DOUBLE_TYPE);
-        operandCallByteCodeGen(this.shiftX, context, m, localVarConsumer);
+        AstNode.operandCallByteCodeGen(this.shiftX, context, m, localVarConsumer);
         m.add(Type.DOUBLE_TYPE);
 
         m.load(2, Type.INT_TYPE);
         m.cast(Type.INT_TYPE, Type.DOUBLE_TYPE);
         m.dconst(this.yScale);
         m.mul(Type.DOUBLE_TYPE);
-        operandCallByteCodeGen(this.shiftY, context, m, localVarConsumer);
+        AstNode.operandCallByteCodeGen(this.shiftY, context, m, localVarConsumer);
         m.add(Type.DOUBLE_TYPE);
 
         m.load(3, Type.INT_TYPE);
         m.cast(Type.INT_TYPE, Type.DOUBLE_TYPE);
         m.dconst(this.xzScale);
         m.mul(Type.DOUBLE_TYPE);
-        operandCallByteCodeGen(this.shiftZ, context, m, localVarConsumer);
+        AstNode.operandCallByteCodeGen(this.shiftZ, context, m, localVarConsumer);
         m.add(Type.DOUBLE_TYPE);
 
         m.invokevirtual(

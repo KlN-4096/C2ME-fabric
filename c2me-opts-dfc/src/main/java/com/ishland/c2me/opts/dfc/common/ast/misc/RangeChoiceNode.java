@@ -208,7 +208,7 @@ public class RangeChoiceNode implements AstNode {
     @Override
     public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
         int inputValue = localVarConsumer.createLocalVariable("inputValue", Type.DOUBLE_TYPE.getDescriptor());
-        operandCallByteCodeGen(this.input, context, m, localVarConsumer);
+        AstNode.operandCallByteCodeGen(this.input, context, m, localVarConsumer);
         m.store(inputValue, Type.DOUBLE_TYPE);
 
         Label whenOutOfRangeLabel = new Label();
@@ -226,7 +226,7 @@ public class RangeChoiceNode implements AstNode {
         if (this.whenInRange.equals(this.input)) {
             m.load(inputValue, Type.DOUBLE_TYPE);
         } else {
-            operandCallByteCodeGen(this.whenInRange, context, m, localVarConsumer);
+            AstNode.operandCallByteCodeGen(this.whenInRange, context, m, localVarConsumer);
         }
         m.goTo(end);
 
@@ -234,7 +234,7 @@ public class RangeChoiceNode implements AstNode {
         if (this.whenOutOfRange.equals(this.input)) {
             m.load(inputValue, Type.DOUBLE_TYPE);
         } else {
-            operandCallByteCodeGen(this.whenOutOfRange, context, m, localVarConsumer);
+            AstNode.operandCallByteCodeGen(this.whenOutOfRange, context, m, localVarConsumer);
         }
 
         m.visitLabel(end);

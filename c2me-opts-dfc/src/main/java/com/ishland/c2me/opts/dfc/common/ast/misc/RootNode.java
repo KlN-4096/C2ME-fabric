@@ -44,7 +44,7 @@ public class RootNode implements AstNode {
 
     @Override
     public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
-        operandCallByteCodeGen(this.next, context, m, localVarConsumer);
+        AstNode.operandCallByteCodeGen(this.next, context, m, localVarConsumer);
         m.areturn(Type.DOUBLE_TYPE);
     }
 

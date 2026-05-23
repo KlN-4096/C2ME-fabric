@@ -119,8 +119,8 @@ public class SplineAstNode implements AstNode, IInlineableAstNode {
 
             int lastConst = impl.locations().length - 1;
 
-            String locationFunction = context.newSingleMethod(McToAst.toAst(impl.locationFunction().function().value()));
-            context.callDelegateSingle(m, locationFunction);
+            AstNode locationFunction = McToAst.toAst(impl.locationFunction().function().value());
+            AstNode.operandCallByteCodeGen(locationFunction, context, m, localVarConsumer);
             m.cast(Type.DOUBLE_TYPE, Type.FLOAT_TYPE);
             m.store(point, Type.FLOAT_TYPE);
 

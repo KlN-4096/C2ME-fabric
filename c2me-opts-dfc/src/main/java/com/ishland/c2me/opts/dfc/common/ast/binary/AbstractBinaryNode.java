@@ -85,8 +85,8 @@ public abstract class AbstractBinaryNode implements AstNode {
 
     @Override
     public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
-        operandCallByteCodeGen(this.left, context, m, localVarConsumer);
-        operandCallByteCodeGen(this.right, context, m, localVarConsumer);
+        AstNode.operandCallByteCodeGen(this.left, context, m, localVarConsumer);
+        AstNode.operandCallByteCodeGen(this.right, context, m, localVarConsumer);
     }
 
     @Override

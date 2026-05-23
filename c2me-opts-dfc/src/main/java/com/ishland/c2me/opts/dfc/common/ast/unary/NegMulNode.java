@@ -43,7 +43,7 @@ public class NegMulNode extends AbstractUnaryNode implements IInlineableAstNode 
 
     @Override
     public void emitValueSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
-        operandCallByteCodeGen(this.operand, context, m, localVarConsumer);
+        AstNode.operandCallByteCodeGen(this.operand, context, m, localVarConsumer);
         int v = localVarConsumer.createLocalVariable("v", Type.DOUBLE_TYPE.getDescriptor());
         m.store(v, Type.DOUBLE_TYPE);
 

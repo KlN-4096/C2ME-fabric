@@ -34,7 +34,7 @@ public class SquareNode extends AbstractUnaryNode implements IInlineableAstNode 
 
     @Override
     public void emitValueSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
-        operandCallByteCodeGen(this.operand, context, m, localVarConsumer);
+        AstNode.operandCallByteCodeGen(this.operand, context, m, localVarConsumer);
         m.dup2();
         m.mul(Type.DOUBLE_TYPE);
     }

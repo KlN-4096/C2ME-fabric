@@ -36,7 +36,7 @@ public class SqueezeNode extends AbstractUnaryNode implements IInlineableAstNode
 
     @Override
     public void emitValueSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
-        operandCallByteCodeGen(this.operand, context, m, localVarConsumer);
+        AstNode.operandCallByteCodeGen(this.operand, context, m, localVarConsumer);
         m.dconst(-1.0); // min
         m.invokestatic(
                 Type.getInternalName(Math.class),

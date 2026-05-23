@@ -74,7 +74,7 @@ public class CacheLikeNode implements AstNode {
     @Override
     public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
         if (this.cacheLike == null) {
-            operandCallByteCodeGen(this.delegate, context, m, localVarConsumer);
+            AstNode.operandCallByteCodeGen(this.delegate, context, m, localVarConsumer);
             m.areturn(Type.DOUBLE_TYPE);
             return;
         }
@@ -115,7 +115,7 @@ public class CacheLikeNode implements AstNode {
         m.visitLabel(cacheMiss);
         m.pop2();
 
-        operandCallByteCodeGen(this.delegate, context, m, localVarConsumer);
+        AstNode.operandCallByteCodeGen(this.delegate, context, m, localVarConsumer);
         m.store(eval, Type.DOUBLE_TYPE);
 
         m.load(cacheVar, InstructionAdapter.OBJECT_TYPE);

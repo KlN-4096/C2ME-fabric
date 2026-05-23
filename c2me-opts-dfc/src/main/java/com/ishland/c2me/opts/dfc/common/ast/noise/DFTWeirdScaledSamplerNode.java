@@ -62,7 +62,7 @@ public class DFTWeirdScaledSamplerNode implements AstNode {
         String noiseField = context.newField(DensityFunction.Noise.class, this.noise);
         int scale = localVarConsumer.createLocalVariable("scale", Type.DOUBLE_TYPE.getDescriptor());
 
-        operandCallByteCodeGen(this.input, context, m, localVarConsumer);
+        AstNode.operandCallByteCodeGen(this.input, context, m, localVarConsumer);
 
         switch (this.mapper) {
             case TYPE1 -> m.invokestatic(

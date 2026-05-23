@@ -37,7 +37,7 @@ public class MulNode extends AbstractBinaryNode implements IInlineableAstNode {
     @Override
     public void emitValueSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
         if (this.right instanceof ConstantNode constant) {
-            operandCallByteCodeGen(this.left, context, m, localVarConsumer);
+            AstNode.operandCallByteCodeGen(this.left, context, m, localVarConsumer);
             m.dconst(constant.getValue());
             m.mul(Type.DOUBLE_TYPE);
             return;
@@ -46,7 +46,7 @@ public class MulNode extends AbstractBinaryNode implements IInlineableAstNode {
         Label notZero = new Label();
         Label end = new Label();
 
-        operandCallByteCodeGen(this.left, context, m, localVarConsumer);
+        AstNode.operandCallByteCodeGen(this.left, context, m, localVarConsumer);
         m.dup2();
         m.dconst(0.0);
         m.cmpl(Type.DOUBLE_TYPE);
@@ -56,7 +56,7 @@ public class MulNode extends AbstractBinaryNode implements IInlineableAstNode {
         m.goTo(end);
 
         m.visitLabel(notZero);
-        operandCallByteCodeGen(this.right, context, m, localVarConsumer);
+        AstNode.operandCallByteCodeGen(this.right, context, m, localVarConsumer);
         m.mul(Type.DOUBLE_TYPE);
         m.visitLabel(end);
     }

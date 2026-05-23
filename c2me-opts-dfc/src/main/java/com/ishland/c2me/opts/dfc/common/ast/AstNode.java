@@ -17,7 +17,7 @@ public interface AstNode {
 
     void doBytecodeGenMulti(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer);
 
-    default void operandCallByteCodeGen(AstNode operand, BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
+    static void operandCallByteCodeGen(AstNode operand, BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
         if (operand instanceof IInlineableAstNode inlineable) {
             inlineable.emitValueSingle(context, m, localVarConsumer);
         } else {
