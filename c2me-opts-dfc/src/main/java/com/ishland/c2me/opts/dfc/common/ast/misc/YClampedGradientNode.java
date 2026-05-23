@@ -1,7 +1,7 @@
 package com.ishland.c2me.opts.dfc.common.ast.misc;
 
 import com.ishland.c2me.opts.dfc.common.ast.AstNode;
-import com.ishland.c2me.opts.dfc.common.ast.IInlineableAstNode;
+import com.ishland.c2me.opts.dfc.common.ducks.ISingleInlineableAstNode;
 import com.ishland.c2me.opts.dfc.common.ast.AstTransformer;
 import com.ishland.c2me.opts.dfc.common.ast.EvalType;
 import com.ishland.c2me.opts.dfc.common.gen.BytecodeGen;
@@ -10,9 +10,7 @@ import net.minecraft.util.math.MathHelper;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.InstructionAdapter;
 
-import java.util.Objects;
-
-public class YClampedGradientNode implements AstNode, IInlineableAstNode {
+public class YClampedGradientNode implements AstNode, ISingleInlineableAstNode {
 
     private final double fromY;
     private final double toY;

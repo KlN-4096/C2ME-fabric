@@ -1,13 +1,14 @@
 package com.ishland.c2me.opts.dfc.common.ast.unary;
 
 import com.ishland.c2me.opts.dfc.common.ast.AstNode;
-import com.ishland.c2me.opts.dfc.common.ast.IInlineableAstNode;
+import com.ishland.c2me.opts.dfc.common.ducks.IMultiInlineableAstNode;
+import com.ishland.c2me.opts.dfc.common.ducks.ISingleInlineableAstNode;
 import com.ishland.c2me.opts.dfc.common.ast.EvalType;
 import com.ishland.c2me.opts.dfc.common.gen.BytecodeGen;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.InstructionAdapter;
 
-public class SquareNode extends AbstractUnaryNode implements IInlineableAstNode {
+public class SquareNode extends AbstractSimpleUnaryNode implements ISingleInlineableAstNode, IMultiInlineableAstNode {
 
     public SquareNode(AstNode operand) {
         super(operand);
@@ -46,17 +47,13 @@ public class SquareNode extends AbstractUnaryNode implements IInlineableAstNode 
     }
 
     @Override
-    public void doBytecodeGenMulti(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
-        super.doBytecodeGenMulti(context, m, localVarConsumer);
-        context.doCountedLoop(m, localVarConsumer, idx -> {
-            m.load(1, InstructionAdapter.OBJECT_TYPE);
-            m.load(idx, Type.INT_TYPE);
-            m.dup2();
-            m.aload(Type.DOUBLE_TYPE);
-            m.dup2();
-            m.mul(Type.DOUBLE_TYPE);
-            m.astore(Type.DOUBLE_TYPE);
-        });
-        m.areturn(Type.VOID_TYPE);
+    protected void bytecodeGenMultiBody(InstructionAdapter m, int idx, int resultArrayLocal) {
+        m.load(resultArrayLocal, InstructionAdapter.OBJECT_TYPE);
+        m.load(idx, Type.INT_TYPE);
+        m.dup2();
+        m.aload(Type.DOUBLE_TYPE);
+        m.dup2();
+        m.mul(Type.DOUBLE_TYPE);
+        m.astore(Type.DOUBLE_TYPE);
     }
 }

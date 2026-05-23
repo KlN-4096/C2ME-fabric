@@ -542,11 +542,13 @@ public class BytecodeGen {
                     )
             );
             List<IntObjectPair<Pair<String, String>>> extraLocals = new ArrayList<>();
+            int[] nextLocalSlot = {5};
             Label start = new Label();
             Label end = new Label();
             adapter.visitLabel(start);
             generator.accept(adapter, (localName, localDesc) -> {
-                int ordinal = extraLocals.size() + 5;
+                int ordinal = nextLocalSlot[0];
+                nextLocalSlot[0] += Type.getType(localDesc).getSize();
                 extraLocals.add(IntObjectPair.of(ordinal, Pair.of(localName, localDesc)));
                 return ordinal;
             });
@@ -592,20 +594,22 @@ public class BytecodeGen {
                     )
             );
             List<IntObjectPair<Pair<String, String>>> extraLocals = new ArrayList<>();
+            int[] nextLocalSlot = {7};
             Label start = new Label();
             Label end = new Label();
             adapter.visitLabel(start);
             generator.accept(adapter, (localName, localDesc) -> {
-                int ordinal = extraLocals.size() + 7;
+                int ordinal = nextLocalSlot[0];
+                nextLocalSlot[0] += Type.getType(localDesc).getSize();
                 extraLocals.add(IntObjectPair.of(ordinal, Pair.of(localName, localDesc)));
                 return ordinal;
             });
             adapter.visitLabel(end);
             adapter.visitLocalVariable("this", this.classDesc, null, start, end, 0);
             adapter.visitLocalVariable("res", Type.getType(double[].class).getDescriptor(), null, start, end, 1);
-            adapter.visitLocalVariable("x", Type.getType(double[].class).getDescriptor(), null, start, end, 2);
-            adapter.visitLocalVariable("y", Type.getType(double[].class).getDescriptor(), null, start, end, 3);
-            adapter.visitLocalVariable("z", Type.getType(double[].class).getDescriptor(), null, start, end, 4);
+            adapter.visitLocalVariable("x", Type.getType(int[].class).getDescriptor(), null, start, end, 2);
+            adapter.visitLocalVariable("y", Type.getType(int[].class).getDescriptor(), null, start, end, 3);
+            adapter.visitLocalVariable("z", Type.getType(int[].class).getDescriptor(), null, start, end, 4);
             adapter.visitLocalVariable("evalType", Type.getType(EvalType.class).getDescriptor(), null, start, end, 5);
             adapter.visitLocalVariable("arrayCache", Type.getType(ArrayCache.class).getDescriptor(), null, start, end, 6);
             for (IntObjectPair<Pair<String, String>> local : extraLocals) {
@@ -632,8 +636,12 @@ public class BytecodeGen {
         }
 
         public void callDelegateMulti(InstructionAdapter m, String target) {
+            callDelegateMulti(m, target, 1);
+        }
+
+        public void callDelegateMulti(InstructionAdapter m, String target, int resultArrayLocal) {
             m.load(0, InstructionAdapter.OBJECT_TYPE);
-            m.load(1, InstructionAdapter.OBJECT_TYPE);
+            m.load(resultArrayLocal, InstructionAdapter.OBJECT_TYPE);
             m.load(2, InstructionAdapter.OBJECT_TYPE);
             m.load(3, InstructionAdapter.OBJECT_TYPE);
             m.load(4, InstructionAdapter.OBJECT_TYPE);

@@ -3,7 +3,6 @@ package com.ishland.c2me.opts.dfc.common.ast.binary;
 import com.ishland.c2me.opts.dfc.common.ast.AstTransformer;
 import com.ishland.c2me.opts.dfc.common.ast.AstNode;
 import com.ishland.c2me.opts.dfc.common.gen.BytecodeGen;
-import com.ishland.c2me.opts.dfc.common.util.ArrayCache;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.InstructionAdapter;
 
@@ -91,37 +90,7 @@ public abstract class AbstractBinaryNode implements AstNode {
 
     @Override
     public void doBytecodeGenMulti(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
-        String leftMethod = context.newMultiMethod(this.left);
-        String rightMethod = context.newMultiMethod(this.right);
-
-        int res1 = localVarConsumer.createLocalVariable("res1", Type.getDescriptor(double[].class));
-
-        m.load(6, InstructionAdapter.OBJECT_TYPE);
-        m.load(1, InstructionAdapter.OBJECT_TYPE);
-        m.arraylength();
-        m.iconst(0);
-        m.invokevirtual(Type.getInternalName(ArrayCache.class), "getDoubleArray", Type.getMethodDescriptor(Type.getType(double[].class), Type.INT_TYPE, Type.BOOLEAN_TYPE), false);
-        m.store(res1, InstructionAdapter.OBJECT_TYPE);
-        context.callDelegateMulti(m, leftMethod);
-        m.load(0, InstructionAdapter.OBJECT_TYPE);
-        m.load(res1, InstructionAdapter.OBJECT_TYPE);
-        m.load(2, InstructionAdapter.OBJECT_TYPE);
-        m.load(3, InstructionAdapter.OBJECT_TYPE);
-        m.load(4, InstructionAdapter.OBJECT_TYPE);
-        m.load(5, InstructionAdapter.OBJECT_TYPE);
-        m.load(6, InstructionAdapter.OBJECT_TYPE);
-        m.invokevirtual(context.className, rightMethod, BytecodeGen.Context.MULTI_DESC, false);
-
-        context.doCountedLoop(m, localVarConsumer, idx -> bytecodeGenMultiBody(m, idx, res1));
-
-        m.load(6, InstructionAdapter.OBJECT_TYPE);
-        m.load(res1, InstructionAdapter.OBJECT_TYPE);
-        m.invokevirtual(Type.getInternalName(ArrayCache.class), "recycle", Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(double[].class)), false);
-
+        context.delegateToSingle(m, localVarConsumer, this);
         m.areturn(Type.VOID_TYPE);
     }
-
-    protected abstract void bytecodeGenMultiBody(InstructionAdapter m, int idx, int res1);
-
-
 }

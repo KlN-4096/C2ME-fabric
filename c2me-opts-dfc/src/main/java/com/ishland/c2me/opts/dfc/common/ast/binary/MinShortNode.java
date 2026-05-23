@@ -106,9 +106,4 @@ public class MinShortNode extends AbstractBinaryNode {
 
         m.areturn(Type.VOID_TYPE);
     }
-
-    @Override
-    protected void bytecodeGenMultiBody(InstructionAdapter m, int idx, int res1) {
-        throw new UnsupportedOperationException();
-    }
 }

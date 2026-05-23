@@ -1,7 +1,7 @@
 package com.ishland.c2me.opts.dfc.common.ast.spline;
 
 import com.ishland.c2me.opts.dfc.common.ast.AstNode;
-import com.ishland.c2me.opts.dfc.common.ast.IInlineableAstNode;
+import com.ishland.c2me.opts.dfc.common.ducks.ISingleInlineableAstNode;
 import com.ishland.c2me.opts.dfc.common.ast.AstTransformer;
 import com.ishland.c2me.opts.dfc.common.ast.EvalType;
 import com.ishland.c2me.opts.dfc.common.ast.McToAst;
@@ -24,7 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class SplineAstNode implements AstNode, IInlineableAstNode {
+public class SplineAstNode implements AstNode, ISingleInlineableAstNode {
 
     public static final String SPLINE_METHOD_DESC = Type.getMethodDescriptor(Type.getType(float.class), Type.getType(int.class), Type.getType(int.class), Type.getType(int.class), Type.getType(EvalType.class));
     private final Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> spline;

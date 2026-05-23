@@ -1,14 +1,13 @@
 package com.ishland.c2me.opts.dfc.common.ast.unary;
 
 import com.ishland.c2me.opts.dfc.common.ast.AstNode;
-import com.ishland.c2me.opts.dfc.common.ast.IInlineableAstNode;
 import com.ishland.c2me.opts.dfc.common.ast.EvalType;
 import com.ishland.c2me.opts.dfc.common.gen.BytecodeGen;
 import net.minecraft.util.math.MathHelper;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.InstructionAdapter;
 
-public class SqueezeNode extends AbstractUnaryNode implements IInlineableAstNode {
+public class SqueezeNode extends AbstractUnaryNode {
 
     public SqueezeNode(AstNode operand) {
         super(operand);
@@ -34,7 +33,6 @@ public class SqueezeNode extends AbstractUnaryNode implements IInlineableAstNode
         }
     }
 
-    @Override
     public void emitValueSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
         AstNode.operandCallByteCodeGen(this.operand, context, m, localVarConsumer);
         m.dconst(-1.0); // min
@@ -78,9 +76,9 @@ public class SqueezeNode extends AbstractUnaryNode implements IInlineableAstNode
 
     @Override
     public void doBytecodeGenMulti(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
-        super.doBytecodeGenMulti(context, m, localVarConsumer);
+        AstNode.operandCallMultiByteCodeGen(this.operand, context, m, localVarConsumer, 1);
+        int v = localVarConsumer.createLocalVariable("v", Type.DOUBLE_TYPE.getDescriptor());
         context.doCountedLoop(m, localVarConsumer, idx -> {
-            int v = localVarConsumer.createLocalVariable("v", Type.DOUBLE_TYPE.getDescriptor());
             m.load(1, InstructionAdapter.OBJECT_TYPE);
             m.load(idx, Type.INT_TYPE);
             m.dup2();

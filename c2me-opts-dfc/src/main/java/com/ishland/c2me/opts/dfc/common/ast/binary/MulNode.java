@@ -1,7 +1,8 @@
 package com.ishland.c2me.opts.dfc.common.ast.binary;
 
 import com.ishland.c2me.opts.dfc.common.ast.AstNode;
-import com.ishland.c2me.opts.dfc.common.ast.IInlineableAstNode;
+import com.ishland.c2me.opts.dfc.common.ducks.IMultiInlineableAstNode;
+import com.ishland.c2me.opts.dfc.common.ducks.ISingleInlineableAstNode;
 import com.ishland.c2me.opts.dfc.common.ast.EvalType;
 import com.ishland.c2me.opts.dfc.common.ast.misc.ConstantNode;
 import com.ishland.c2me.opts.dfc.common.gen.BytecodeGen;
@@ -9,7 +10,7 @@ import org.objectweb.asm.Label;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.InstructionAdapter;
 
-public class MulNode extends AbstractBinaryNode implements IInlineableAstNode {
+public class MulNode extends AbstractBinaryNode implements ISingleInlineableAstNode, IMultiInlineableAstNode {
 
     public MulNode(AstNode left, AstNode right) {
         super(left, right);
@@ -67,20 +68,20 @@ public class MulNode extends AbstractBinaryNode implements IInlineableAstNode {
         m.areturn(Type.DOUBLE_TYPE);
     }
 
+
     @Override
-    public void doBytecodeGenMulti(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
-        String leftMethod = context.newMultiMethod(this.left);
+    public void emitMulti(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer, int resultArrayLocal) {
         String rightMethodSingle = context.newSingleMethod(this.right);
-        context.callDelegateMulti(m, leftMethod);
+        AstNode.operandCallMultiByteCodeGen(this.left, context, m, localVarConsumer, resultArrayLocal);
 
         context.doCountedLoop(m, localVarConsumer, idx -> {
             Label minLabel = new Label();
             Label end = new Label();
 
-            m.load(1, InstructionAdapter.OBJECT_TYPE);
+            m.load(resultArrayLocal, InstructionAdapter.OBJECT_TYPE);
             m.load(idx, Type.INT_TYPE);
 
-            m.load(1, InstructionAdapter.OBJECT_TYPE);
+            m.load(resultArrayLocal, InstructionAdapter.OBJECT_TYPE);
             m.load(idx, Type.INT_TYPE);
             m.aload(Type.DOUBLE_TYPE);
 
@@ -110,12 +111,11 @@ public class MulNode extends AbstractBinaryNode implements IInlineableAstNode {
             m.visitLabel(end);
             m.astore(Type.DOUBLE_TYPE);
         });
-
-        m.areturn(Type.VOID_TYPE);
     }
 
     @Override
-    protected void bytecodeGenMultiBody(InstructionAdapter m, int idx, int res1) {
-        throw new UnsupportedOperationException();
+    public void doBytecodeGenMulti(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
+        emitMulti(context, m, localVarConsumer, 1);
+        m.areturn(Type.VOID_TYPE);
     }
 }

@@ -1,13 +1,14 @@
 package com.ishland.c2me.opts.dfc.common.ast.binary;
 
 import com.ishland.c2me.opts.dfc.common.ast.AstNode;
-import com.ishland.c2me.opts.dfc.common.ast.IInlineableAstNode;
+import com.ishland.c2me.opts.dfc.common.ducks.IMultiInlineableAstNode;
+import com.ishland.c2me.opts.dfc.common.ducks.ISingleInlineableAstNode;
 import com.ishland.c2me.opts.dfc.common.ast.EvalType;
 import com.ishland.c2me.opts.dfc.common.gen.BytecodeGen;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.InstructionAdapter;
 
-public class MaxNode extends AbstractBinaryNode implements IInlineableAstNode {
+public class MaxNode extends AbstractSimpleBinaryNode implements ISingleInlineableAstNode, IMultiInlineableAstNode {
 
     public MaxNode(AstNode left, AstNode right) {
         super(left, right);
@@ -52,8 +53,8 @@ public class MaxNode extends AbstractBinaryNode implements IInlineableAstNode {
     }
 
     @Override
-    protected void bytecodeGenMultiBody(InstructionAdapter m, int idx, int res1) {
-        m.load(1, InstructionAdapter.OBJECT_TYPE);
+    protected void bytecodeGenMultiBody(InstructionAdapter m, int idx, int res1, int resultArrayLocal) {
+        m.load(resultArrayLocal, InstructionAdapter.OBJECT_TYPE);
         m.load(idx, Type.INT_TYPE);
         m.dup2();
         m.aload(Type.DOUBLE_TYPE);

@@ -1,9 +1,9 @@
-package com.ishland.c2me.opts.dfc.common.ast;
+package com.ishland.c2me.opts.dfc.common.ducks;
 
 import com.ishland.c2me.opts.dfc.common.gen.BytecodeGen;
 import org.objectweb.asm.commons.InstructionAdapter;
 
-public interface IInlineableAstNode {
+public interface ISingleInlineableAstNode {
 
     // Emits bytecode pushing the computed double value onto the stack.
     // Caller handles return or further computation so no emit RETURN.

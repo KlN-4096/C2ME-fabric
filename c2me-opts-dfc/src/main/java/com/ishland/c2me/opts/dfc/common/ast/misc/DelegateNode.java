@@ -6,7 +6,7 @@ import com.ishland.c2me.opts.dfc.common.util.ArrayCache;
 import com.ishland.c2me.opts.dfc.common.vif.EachApplierVanillaInterface;
 import com.ishland.c2me.opts.dfc.common.ast.AstNode;
 import com.ishland.c2me.opts.dfc.common.ast.EvalType;
-import com.ishland.c2me.opts.dfc.common.ast.IInlineableAstNode;
+import com.ishland.c2me.opts.dfc.common.ducks.ISingleInlineableAstNode;
 import com.ishland.c2me.opts.dfc.common.vif.NoisePosVanillaInterface;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.world.gen.densityfunction.DensityFunction;
@@ -16,7 +16,7 @@ import org.objectweb.asm.commons.InstructionAdapter;
 
 import java.util.Objects;
 
-public class DelegateNode implements AstNode, IInlineableAstNode {
+public class DelegateNode implements AstNode, ISingleInlineableAstNode {
 
 //    private static final ConcurrentHashMap<Class<?>, LongAdder> statistics = new ConcurrentHashMap<>();
 
