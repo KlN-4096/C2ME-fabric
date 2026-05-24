@@ -5,13 +5,12 @@ import com.ishland.c2me.opts.dfc.common.ducks.ISingleInlineableAstNode;
 import com.ishland.c2me.opts.dfc.common.ast.AstTransformer;
 import com.ishland.c2me.opts.dfc.common.ast.EvalType;
 import com.ishland.c2me.opts.dfc.common.ast.McToAst;
+import com.ishland.c2me.opts.dfc.common.ast.AstOptimizer;
 import com.ishland.c2me.opts.dfc.common.gen.BytecodeGen;
 import com.ishland.c2me.opts.dfc.common.vif.NoisePosVanillaInterface;
 import com.ishland.flowsched.util.Assertions;
 import it.unimi.dsi.fastutil.Pair;
 import it.unimi.dsi.fastutil.ints.IntObjectPair;
-import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Spline;
 import net.minecraft.world.gen.densityfunction.DensityFunctionTypes;
 import org.objectweb.asm.Label;
@@ -119,7 +118,7 @@ public class SplineAstNode implements AstNode, ISingleInlineableAstNode {
 
             int lastConst = impl.locations().length - 1;
 
-            AstNode locationFunction = McToAst.toAst(impl.locationFunction().function().value());
+            AstNode locationFunction = AstOptimizer.optimize(McToAst.toAst(impl.locationFunction().function().value()));
             AstNode.operandCallByteCodeGen(locationFunction, context, m, localVarConsumer);
             m.cast(Type.DOUBLE_TYPE, Type.FLOAT_TYPE);
             m.store(point, Type.FLOAT_TYPE);
@@ -156,12 +155,35 @@ public class SplineAstNode implements AstNode, ISingleInlineableAstNode {
                 );
                 m.store(rangeForLocation, Type.INT_TYPE);
 
-                Label label1 = new Label();
-                Label label2 = new Label();
+                int n = localVarConsumer.createLocalVariable("n", Type.FLOAT_TYPE.getDescriptor());
+                int o = localVarConsumer.createLocalVariable("o", Type.FLOAT_TYPE.getDescriptor());
 
+                Label lowerOutsideLabel = new Label();
+                Label upperOutsideLabel = new Label();
+                Label defaultLabel = new Label();
+                Label label3 = new Label();
+                int middleCount = valuesMethods.length - 1;
+                Label[] middleLabels = new Label[middleCount];
+                boolean[] jumpGenerated = new boolean[middleCount];
+                Label[] jumpLabels = new Label[lastConst + 2];
+                jumpLabels[0] = lowerOutsideLabel;
+                jumpLabels[lastConst + 1] = upperOutsideLabel;
+                for (int i = 0; i < middleCount; i++) {
+                    middleLabels[i] = new Label();
+                    jumpLabels[i + 1] = middleLabels[i];
+                }
+
+                // findRangeForLocation returns -1 below the first location, lastConst above
+                // the last location, and [0, lastConst) for interpolated ranges.
                 m.load(rangeForLocation, Type.INT_TYPE);
-                m.ifge(label1);
-                // rangeForLocation < 0
+                m.tableswitch(
+                        -1,
+                        lastConst,
+                        defaultLabel,
+                        jumpLabels
+                );
+
+                m.visitLabel(lowerOutsideLabel);
                 m.load(point, Type.FLOAT_TYPE);
                 m.load(locArr, InstructionAdapter.OBJECT_TYPE);
                 callSplineSingle(context, m, valuesMethods[0]);
@@ -175,11 +197,7 @@ public class SplineAstNode implements AstNode, ISingleInlineableAstNode {
                 );
                 m.areturn(Type.FLOAT_TYPE);
 
-                m.visitLabel(label1);
-                m.load(rangeForLocation, Type.INT_TYPE);
-                m.iconst(lastConst);
-                m.ificmpne(label2);
-                // rangeForLocation == last
+                m.visitLabel(upperOutsideLabel);
                 m.load(point, Type.FLOAT_TYPE);
                 m.load(locArr, InstructionAdapter.OBJECT_TYPE);
                 callSplineSingle(context, m, valuesMethods[lastConst]);
@@ -193,65 +211,13 @@ public class SplineAstNode implements AstNode, ISingleInlineableAstNode {
                 );
                 m.areturn(Type.FLOAT_TYPE);
 
-                m.visitLabel(label2);
-
-                int loc0 = localVarConsumer.createLocalVariable("loc0", Type.FLOAT_TYPE.getDescriptor());
-                int loc1 = localVarConsumer.createLocalVariable("loc1", Type.FLOAT_TYPE.getDescriptor());
-                int locDist = localVarConsumer.createLocalVariable("locDist", Type.FLOAT_TYPE.getDescriptor());
-                int k = localVarConsumer.createLocalVariable("k", Type.FLOAT_TYPE.getDescriptor());
-                int n = localVarConsumer.createLocalVariable("n", Type.FLOAT_TYPE.getDescriptor());
-                int o = localVarConsumer.createLocalVariable("o", Type.FLOAT_TYPE.getDescriptor());
-                int onDist = localVarConsumer.createLocalVariable("onDist", Type.FLOAT_TYPE.getDescriptor());
-                int p = localVarConsumer.createLocalVariable("p", Type.FLOAT_TYPE.getDescriptor());
-                int q = localVarConsumer.createLocalVariable("q", Type.FLOAT_TYPE.getDescriptor());
-
-                m.load(locArr, InstructionAdapter.OBJECT_TYPE);
-                m.load(rangeForLocation, Type.INT_TYPE);
-                m.aload(Type.FLOAT_TYPE);
-                m.store(loc0, Type.FLOAT_TYPE);
-
-                m.load(locArr, InstructionAdapter.OBJECT_TYPE);
-                m.load(rangeForLocation, Type.INT_TYPE);
-                m.iconst(1);
-                m.add(Type.INT_TYPE);
-                m.aload(Type.FLOAT_TYPE);
-                m.store(loc1, Type.FLOAT_TYPE);
-
-                m.load(loc1, Type.FLOAT_TYPE);
-                m.load(loc0, Type.FLOAT_TYPE);
-                m.sub(Type.FLOAT_TYPE);
-                m.store(locDist, Type.FLOAT_TYPE);
-
-                m.load(point, Type.FLOAT_TYPE);
-                m.load(loc0, Type.FLOAT_TYPE);
-                m.sub(Type.FLOAT_TYPE);
-                m.load(locDist, Type.FLOAT_TYPE);
-                m.div(Type.FLOAT_TYPE);
-                m.store(k, Type.FLOAT_TYPE);
-
-                Label[] jumpLabels = new Label[valuesMethods.length - 1];
-                boolean[] jumpGenerated = new boolean[valuesMethods.length - 1];
-                for (int i = 0; i < valuesMethods.length - 1; i++) {
-                    jumpLabels[i] = new Label();
-                }
-                Label defaultLabel = new Label();
-                Label label3 = new Label();
-
-                m.load(rangeForLocation, Type.INT_TYPE);
-                m.tableswitch(
-                        0,
-                        valuesMethods.length - 2,
-                        defaultLabel,
-                        jumpLabels
-                );
-
-                for (int i = 0; i < valuesMethods.length - 1; i++) {
+                for (int i = 0; i < middleCount; i++) {
                     if (jumpGenerated[i]) continue;
-                    m.visitLabel(jumpLabels[i]);
+                    m.visitLabel(middleLabels[i]);
                     jumpGenerated[i] = true;
-                    for (int j = i + 1; j < valuesMethods.length - 1; j++) { // deduplication
+                    for (int j = i + 1; j < middleCount; j++) { // deduplication
                         if (valuesMethods[i].equals(valuesMethods[j]) && valuesMethods[i + 1].equals(valuesMethods[j + 1])) {
-                            m.visitLabel(jumpLabels[j]);
+                            m.visitLabel(middleLabels[j]);
                             jumpGenerated[j] = true;
                         }
                     }
@@ -282,54 +248,18 @@ public class SplineAstNode implements AstNode, ISingleInlineableAstNode {
 
                 m.visitLabel(label3);
 
+                m.load(point, Type.FLOAT_TYPE);
+                m.load(locArr, InstructionAdapter.OBJECT_TYPE);
+                m.load(derArr, InstructionAdapter.OBJECT_TYPE);
+                m.load(rangeForLocation, Type.INT_TYPE);
+                m.load(n, Type.FLOAT_TYPE);
                 m.load(o, Type.FLOAT_TYPE);
-                m.load(n, Type.FLOAT_TYPE);
-                m.sub(Type.FLOAT_TYPE);
-                m.store(onDist, Type.FLOAT_TYPE);
-
-                m.load(derArr, InstructionAdapter.OBJECT_TYPE);
-                m.load(rangeForLocation, Type.INT_TYPE);
-                m.aload(Type.FLOAT_TYPE);
-                m.load(locDist, Type.FLOAT_TYPE);
-                m.mul(Type.FLOAT_TYPE);
-                m.load(onDist, Type.FLOAT_TYPE);
-                m.sub(Type.FLOAT_TYPE);
-                m.store(p, Type.FLOAT_TYPE);
-
-                m.load(derArr, InstructionAdapter.OBJECT_TYPE);
-                m.load(rangeForLocation, Type.INT_TYPE);
-                m.iconst(1);
-                m.add(Type.INT_TYPE);
-                m.aload(Type.FLOAT_TYPE);
-                m.neg(Type.FLOAT_TYPE);
-                m.load(locDist, Type.FLOAT_TYPE);
-                m.mul(Type.FLOAT_TYPE);
-                m.load(onDist, Type.FLOAT_TYPE);
-                m.add(Type.FLOAT_TYPE);
-                m.store(q, Type.FLOAT_TYPE);
-
-                // lerp(k, n, o) inlined as k*onDist+n, saving one invokestatic
-                m.load(k, Type.FLOAT_TYPE);
-                m.load(onDist, Type.FLOAT_TYPE);
-                m.mul(Type.FLOAT_TYPE);
-                m.load(n, Type.FLOAT_TYPE);
-                m.add(Type.FLOAT_TYPE);
-                m.load(k, Type.FLOAT_TYPE);
-                m.fconst(1.0F);
-                m.load(k, Type.FLOAT_TYPE);
-                m.sub(Type.FLOAT_TYPE);
-                m.mul(Type.FLOAT_TYPE);
-                m.load(k, Type.FLOAT_TYPE);
-                m.load(p, Type.FLOAT_TYPE);
-                m.load(q, Type.FLOAT_TYPE);
                 m.invokestatic(
-                        Type.getInternalName(MathHelper.class),
-                        FabricLoader.getInstance().getMappingResolver().mapMethodName("intermediary", "net.minecraft.class_3532", "method_16439", "(FFF)F"),
-                        "(FFF)F",
+                        Type.getInternalName(SplineSupport.class),
+                        "sampleInsideRange",
+                        Type.getMethodDescriptor(Type.FLOAT_TYPE, Type.FLOAT_TYPE, Type.getType(float[].class), Type.getType(float[].class), Type.INT_TYPE, Type.FLOAT_TYPE, Type.FLOAT_TYPE),
                         false
                 );
-                m.mul(Type.FLOAT_TYPE);
-                m.add(Type.FLOAT_TYPE);
                 m.areturn(Type.FLOAT_TYPE);
             }
 

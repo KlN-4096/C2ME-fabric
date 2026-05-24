@@ -53,20 +53,9 @@ public class DFTNoiseNode implements AstNode, ISingleInlineableAstNode {
         m.load(0, InstructionAdapter.OBJECT_TYPE);
         m.getfield(context.className, noiseField, Type.getDescriptor(DensityFunction.Noise.class));
 
-        m.load(1, Type.INT_TYPE);
-        m.cast(Type.INT_TYPE, Type.DOUBLE_TYPE);
-        m.dconst(this.xzScale);
-        m.mul(Type.DOUBLE_TYPE);
-
-        m.load(2, Type.INT_TYPE);
-        m.cast(Type.INT_TYPE, Type.DOUBLE_TYPE);
-        m.dconst(this.yScale);
-        m.mul(Type.DOUBLE_TYPE);
-
-        m.load(3, Type.INT_TYPE);
-        m.cast(Type.INT_TYPE, Type.DOUBLE_TYPE);
-        m.dconst(this.xzScale);
-        m.mul(Type.DOUBLE_TYPE);
+        emitScaledCoordSingle(m, 1, this.xzScale);
+        emitScaledCoordSingle(m, 2, this.yScale);
+        emitScaledCoordSingle(m, 3, this.xzScale);
 
         m.invokevirtual(
                 Type.getInternalName(DensityFunction.Noise.class),
@@ -94,26 +83,9 @@ public class DFTNoiseNode implements AstNode, ISingleInlineableAstNode {
                 m.load(0, InstructionAdapter.OBJECT_TYPE);
                 m.getfield(context.className, noiseField, Type.getDescriptor(DensityFunction.Noise.class));
 
-                m.load(2, InstructionAdapter.OBJECT_TYPE);
-                m.load(idx, Type.INT_TYPE);
-                m.aload(Type.INT_TYPE);
-                m.cast(Type.INT_TYPE, Type.DOUBLE_TYPE);
-                m.dconst(this.xzScale);
-                m.mul(Type.DOUBLE_TYPE);
-
-                m.load(3, InstructionAdapter.OBJECT_TYPE);
-                m.load(idx, Type.INT_TYPE);
-                m.aload(Type.INT_TYPE);
-                m.cast(Type.INT_TYPE, Type.DOUBLE_TYPE);
-                m.dconst(this.yScale);
-                m.mul(Type.DOUBLE_TYPE);
-
-                m.load(4, InstructionAdapter.OBJECT_TYPE);
-                m.load(idx, Type.INT_TYPE);
-                m.aload(Type.INT_TYPE);
-                m.cast(Type.INT_TYPE, Type.DOUBLE_TYPE);
-                m.dconst(this.xzScale);
-                m.mul(Type.DOUBLE_TYPE);
+                emitScaledCoordMulti(m, 2, idx, this.xzScale);
+                emitScaledCoordMulti(m, 3, idx, this.yScale);
+                emitScaledCoordMulti(m, 4, idx, this.xzScale);
 
                 m.invokevirtual(
                         Type.getInternalName(DensityFunction.Noise.class),
@@ -127,6 +99,40 @@ public class DFTNoiseNode implements AstNode, ISingleInlineableAstNode {
         });
 
         m.areturn(Type.VOID_TYPE);
+    }
+
+    private static void emitScaledCoordSingle(InstructionAdapter m, int coordLocal, double scale) {
+        if (isPositiveZero(scale)) {
+            m.dconst(0.0);
+            return;
+        }
+
+        m.load(coordLocal, Type.INT_TYPE);
+        m.cast(Type.INT_TYPE, Type.DOUBLE_TYPE);
+        if (Double.compare(scale, 1.0) != 0) {
+            m.dconst(scale);
+            m.mul(Type.DOUBLE_TYPE);
+        }
+    }
+
+    private static void emitScaledCoordMulti(InstructionAdapter m, int coordArrayLocal, int idx, double scale) {
+        if (isPositiveZero(scale)) {
+            m.dconst(0.0);
+            return;
+        }
+
+        m.load(coordArrayLocal, InstructionAdapter.OBJECT_TYPE);
+        m.load(idx, Type.INT_TYPE);
+        m.aload(Type.INT_TYPE);
+        m.cast(Type.INT_TYPE, Type.DOUBLE_TYPE);
+        if (Double.compare(scale, 1.0) != 0) {
+            m.dconst(scale);
+            m.mul(Type.DOUBLE_TYPE);
+        }
+    }
+
+    private static boolean isPositiveZero(double value) {
+        return Double.doubleToRawLongBits(value) == Double.doubleToRawLongBits(0.0);
     }
 
     @Override
