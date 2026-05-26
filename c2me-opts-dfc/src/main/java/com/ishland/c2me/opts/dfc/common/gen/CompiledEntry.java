@@ -15,7 +15,8 @@ public interface CompiledEntry extends ISingleMethod, IMultiMethod {
 
     CompiledEntry newRawInstance(List<?> args);
 
-    void postProcessField(int fieldIndex);
+    default void postProcessField(int fieldIndex) {
+    }
 
     List<Object> getArgs();
 

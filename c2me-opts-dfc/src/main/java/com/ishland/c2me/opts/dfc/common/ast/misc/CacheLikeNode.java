@@ -172,6 +172,10 @@ public class CacheLikeNode implements AstNode {
     }
 
     private void genPostprocessingMethod(BytecodeGen.Context context, String cacheLikeField) {
+        if (!context.requiresPostProcessing()) {
+            return;
+        }
+
         String methodName = String.format("postProcessing_%s", cacheLikeField);
         String delegateSingle = context.newSingleMethod(this.delegate);
         String delegateMulti = context.newMultiMethod(this.delegate);

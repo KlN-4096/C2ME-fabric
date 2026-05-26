@@ -95,6 +95,7 @@ public class BytecodeGen {
 
     public static synchronized CompiledEntry compile0(AstNode node, String rootName) {
         Class<?> cached = compilationCache.get(node);
+        boolean requiresPostProcessing = hasFlatCache(node);
 
         ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         String name = cached != null ? String.format("DfcCompiled_discarded") : String.format("Dfc%s_%d", rootName, ordinal.getAndIncrement());
@@ -102,10 +103,12 @@ public class BytecodeGen {
 
         RootNode rootNode = new RootNode(node);
 
-        Context genContext = new Context(writer, name);
+        Context genContext = new Context(writer, name, requiresPostProcessing);
         genContext.newSingleMethod0((adapter, localVarConsumer) -> rootNode.doBytecodeGenSingle(genContext, adapter, localVarConsumer), "evalSingle", true);
         genContext.newMultiMethod0((adapter, localVarConsumer) -> rootNode.doBytecodeGenMulti(genContext, adapter, localVarConsumer), "evalMulti", true);
-        genPostProcessAll(genContext);
+        if (requiresPostProcessing) {
+            genPostProcessAll(genContext);
+        }
 
         List<Object> args = genContext.args.entrySet().stream()
                 .sorted(Comparator.comparingInt(o -> o.getValue().ordinal()))
@@ -125,7 +128,9 @@ public class BytecodeGen {
         genGetArgs(genContext);
         genNewInstance(genContext);
         genNewRawInstance(genContext);
-        genPostProcessField(genContext);
+        if (requiresPostProcessing) {
+            genPostProcessField(genContext);
+        }
 //        genFields(genContext);
 
         ListIterator<Object> iterator = args.listIterator();
@@ -145,6 +150,18 @@ public class BytecodeGen {
         } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private static boolean hasFlatCache(AstNode node) {
+        if (node instanceof CacheLikeNode cacheLikeNode && (Object) cacheLikeNode.getCacheLike() instanceof DensityFunctionTypes.Wrapper wrapper && wrapper.type() == DensityFunctionTypes.Wrapping.Type.FLAT_CACHE) {
+            return true;
+        }
+        for (AstNode child : node.getChildren()) {
+            if (hasFlatCache(child)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void genConstructor(Context context) {
@@ -218,11 +235,13 @@ public class BytecodeGen {
             m.putfield(context.className, name, Type.getDescriptor(type));
         }
 
-        m.load(2, Type.BOOLEAN_TYPE);
-        m.visitJumpInsn(Opcodes.IFEQ, postProcessEnd);
-        m.load(0, InstructionAdapter.OBJECT_TYPE);
-        m.invokevirtual(context.className, "postProcessAll", "()V", false);
-        m.visitLabel(postProcessEnd);
+        if (context.requiresPostProcessing()) {
+            m.load(2, Type.BOOLEAN_TYPE);
+            m.visitJumpInsn(Opcodes.IFEQ, postProcessEnd);
+            m.load(0, InstructionAdapter.OBJECT_TYPE);
+            m.invokevirtual(context.className, "postProcessAll", "()V", false);
+            m.visitLabel(postProcessEnd);
+        }
 
         m.areturn(Type.VOID_TYPE);
         m.visitLabel(end);
@@ -485,6 +504,7 @@ public class BytecodeGen {
         public final ClassWriter classWriter;
         public final String className;
         public final String classDesc;
+        private final boolean requiresPostProcessing;
         private int methodIdx = 0;
         private final Object2ReferenceOpenHashMap<AstNode, String> singleMethods = new Object2ReferenceOpenHashMap<>();
         private final Object2ReferenceOpenHashMap<AstNode, String> multiMethods = new Object2ReferenceOpenHashMap<>();
@@ -493,10 +513,15 @@ public class BytecodeGen {
         private final Reference2ObjectOpenHashMap<Object, FieldRecord> args = new Reference2ObjectOpenHashMap<>();
         private final Object2ReferenceOpenHashMap<FloatArrayKey, FieldRecord> floatArrayArgs = new Object2ReferenceOpenHashMap<>();
 
-        public Context(ClassWriter classWriter, String className) {
+        public Context(ClassWriter classWriter, String className, boolean requiresPostProcessing) {
             this.classWriter = Objects.requireNonNull(classWriter);
             this.className = Objects.requireNonNull(className);
             this.classDesc = String.format("L%s;", this.className);
+            this.requiresPostProcessing = requiresPostProcessing;
+        }
+
+        public boolean requiresPostProcessing() {
+            return this.requiresPostProcessing;
         }
         
         public String nextMethodName() {
