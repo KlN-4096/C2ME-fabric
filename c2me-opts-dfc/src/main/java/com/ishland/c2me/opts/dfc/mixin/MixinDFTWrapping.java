@@ -102,6 +102,6 @@ public abstract class MixinDFTWrapping implements IFastCacheLike, IEqualityOverr
 
     @Override
     public String c2me$getName() {
-        return "Wrapper";
+        return "Wrapper" + this.type().name();
     }
 }
