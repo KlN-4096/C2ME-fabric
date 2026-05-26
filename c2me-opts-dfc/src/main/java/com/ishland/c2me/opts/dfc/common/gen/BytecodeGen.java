@@ -8,6 +8,7 @@ import com.ishland.c2me.opts.dfc.common.ast.dfvisitor.StripBlending;
 import com.ishland.c2me.opts.dfc.common.ast.misc.CacheLikeNode;
 import com.ishland.c2me.opts.dfc.common.ast.misc.ConstantNode;
 import com.ishland.c2me.opts.dfc.common.ast.misc.RootNode;
+import com.ishland.c2me.opts.dfc.common.ast.spline.SplineAstNode;
 import com.ishland.c2me.opts.dfc.common.util.ArrayCache;
 import com.ishland.c2me.opts.dfc.common.vif.AstVanillaInterface;
 import it.unimi.dsi.fastutil.Hash;
@@ -487,7 +488,7 @@ public class BytecodeGen {
         private int methodIdx = 0;
         private final Object2ReferenceOpenHashMap<AstNode, String> singleMethods = new Object2ReferenceOpenHashMap<>();
         private final Object2ReferenceOpenHashMap<AstNode, String> multiMethods = new Object2ReferenceOpenHashMap<>();
-        private final Object2ReferenceOpenHashMap<Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper>, String> splineMethods = new Object2ReferenceOpenHashMap<>();
+        private final Object2ReferenceOpenHashMap<SplineAstNode, String> splineMethods = new Object2ReferenceOpenHashMap<>();
         private final ObjectOpenHashSet<String> postProcessMethods = new ObjectOpenHashSet<>();
         private final Reference2ObjectOpenHashMap<Object, FieldRecord> args = new Reference2ObjectOpenHashMap<>();
         private final Object2ReferenceOpenHashMap<FloatArrayKey, FieldRecord> floatArrayArgs = new Object2ReferenceOpenHashMap<>();
@@ -619,11 +620,11 @@ public class BytecodeGen {
         }
 
         public String getCachedSplineMethod(Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> spline) {
-            return this.splineMethods.get(spline);
+            return this.splineMethods.get(new SplineAstNode(spline));
         }
 
         public void cacheSplineMethod(Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> spline, String method) {
-            this.splineMethods.put(spline, method);
+            this.splineMethods.put(new SplineAstNode(spline), method);
         }
 
         public void callDelegateSingle(InstructionAdapter m, String target) {
