@@ -1,11 +1,6 @@
 package com.ishland.c2me.opts.dfc.common.ast;
 
-import com.ishland.c2me.opts.dfc.common.ast.opt.AlgebraicSimplification;
-import com.ishland.c2me.opts.dfc.common.ast.opt.ConstantFolding;
-import com.ishland.c2me.opts.dfc.common.ast.opt.IdentityElimination;
-import com.ishland.c2me.opts.dfc.common.ast.opt.RangeChoicePruning;
-import com.ishland.c2me.opts.dfc.common.ast.opt.Reassociation;
-import com.ishland.c2me.opts.dfc.common.ast.opt.StrengthReduction;
+import com.ishland.c2me.opts.dfc.common.ast.opt.*;
 
 public final class AstOptimizer {
 
@@ -22,6 +17,7 @@ public final class AstOptimizer {
             node = ConstantFolding.optimize(node);
             node = StrengthReduction.optimize(node);
             node = AlgebraicSimplification.optimize(node);
+            node = SplineArithmeticOptimization.optimize(node);
             node = IdentityElimination.optimize(node);
             node = RangeChoicePruning.optimize(node);
             iterations++;

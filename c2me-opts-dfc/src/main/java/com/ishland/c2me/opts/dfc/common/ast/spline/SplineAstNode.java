@@ -1,17 +1,17 @@
 package com.ishland.c2me.opts.dfc.common.ast.spline;
 
-import com.ishland.c2me.opts.dfc.common.ast.AstNode;
+import com.ishland.c2me.opts.dfc.common.ast.*;
+import com.ishland.c2me.opts.dfc.common.ast.opt.SplineArithmeticOptimization;
 import com.ishland.c2me.opts.dfc.common.ducks.ISingleInlineableAstNode;
-import com.ishland.c2me.opts.dfc.common.ast.AstTransformer;
-import com.ishland.c2me.opts.dfc.common.ast.EvalType;
-import com.ishland.c2me.opts.dfc.common.ast.McToAst;
-import com.ishland.c2me.opts.dfc.common.ast.AstOptimizer;
 import com.ishland.c2me.opts.dfc.common.gen.BytecodeGen;
+import com.ishland.c2me.opts.dfc.common.vif.AstVanillaInterface;
 import com.ishland.c2me.opts.dfc.common.vif.NoisePosVanillaInterface;
 import com.ishland.flowsched.util.Assertions;
 import it.unimi.dsi.fastutil.Pair;
 import it.unimi.dsi.fastutil.ints.IntObjectPair;
+import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.util.math.Spline;
+import net.minecraft.world.gen.densityfunction.DensityFunction;
 import net.minecraft.world.gen.densityfunction.DensityFunctionTypes;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
@@ -22,6 +22,7 @@ import org.objectweb.asm.commons.InstructionAdapter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 public class SplineAstNode implements AstNode, ISingleInlineableAstNode {
 
@@ -30,6 +31,70 @@ public class SplineAstNode implements AstNode, ISingleInlineableAstNode {
 
     public SplineAstNode(Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> spline) {
         this.spline = spline;
+    }
+
+    public Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> getSpline() {
+        return spline;
+    }
+
+    public SplineAstNode mapLocationFunctions(UnaryOperator<AstNode> mapper) {
+        Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> mapped = mapLocationFunctions(this.spline, mapper);
+        return mapped == this.spline ? this : new SplineAstNode(mapped);
+    }
+
+    public SplineAstNode scaleValues(float factor) {
+        Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> scaled = SplineArithmeticOptimization.scaleValues(this.spline, factor);
+        return scaled == this.spline ? this : new SplineAstNode(scaled);
+    }
+
+    public SplineAstNode offsetValues(float offset) {
+        Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> offsetted = SplineArithmeticOptimization.offsetValues(this.spline, offset);
+        return offsetted == this.spline ? this : new SplineAstNode(offsetted);
+    }
+
+    public SplineAstNode optimizeLocationAffine() {
+        Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> optimized = SplineArithmeticOptimization.optimizeLocationAffine(this.spline);
+        return optimized == this.spline ? this : new SplineAstNode(optimized);
+    }
+
+    private static Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> mapLocationFunctions(
+            Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> spline,
+            UnaryOperator<AstNode> mapper
+    ) {
+        if (spline instanceof Spline.FixedFloatFunction<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper>) {
+            return spline;
+        }
+        if (!(spline instanceof Spline.Implementation<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> impl)) {
+            return spline;
+        }
+
+        DensityFunction locationFunction = impl.locationFunction().function().value();
+        AstNode locationAst = McToAst.toAst(locationFunction);
+        AstNode mappedLocationAst = mapper.apply(locationAst);
+        boolean changed = mappedLocationAst != locationAst;
+
+        List<Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper>> mappedValues = new ArrayList<>(impl.values().size());
+        for (Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> value : impl.values()) {
+            Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> mappedValue = mapLocationFunctions(value, mapper);
+            mappedValues.add(mappedValue);
+            changed |= mappedValue != value;
+        }
+
+        if (!changed) {
+            return spline;
+        }
+
+        DensityFunctionTypes.Spline.DensityFunctionWrapper mappedLocationFunction = mappedLocationAst == locationAst
+                ? impl.locationFunction()
+                : new DensityFunctionTypes.Spline.DensityFunctionWrapper(RegistryEntry.of(new AstVanillaInterface(mappedLocationAst, locationFunction)));
+        return new Spline.Implementation<>(
+                mappedLocationFunction,
+                impl.locations(),
+                mappedValues,
+                impl.derivatives(),
+                impl.min(),
+                impl.max()
+        );
     }
 
     @Override
@@ -118,7 +183,7 @@ public class SplineAstNode implements AstNode, ISingleInlineableAstNode {
 
             int lastConst = impl.locations().length - 1;
 
-            AstNode locationFunction = AstOptimizer.optimize(McToAst.toAst(impl.locationFunction().function().value()));
+            AstNode locationFunction = McToAst.toAst(impl.locationFunction().function().value());
             AstNode.operandCallByteCodeGen(locationFunction, context, m, localVarConsumer);
             m.cast(Type.DOUBLE_TYPE, Type.FLOAT_TYPE);
             m.store(point, Type.FLOAT_TYPE);
