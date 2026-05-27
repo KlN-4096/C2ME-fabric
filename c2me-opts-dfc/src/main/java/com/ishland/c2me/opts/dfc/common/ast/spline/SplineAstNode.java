@@ -6,7 +6,6 @@ import com.ishland.c2me.opts.dfc.common.ducks.ISingleInlineableAstNode;
 import com.ishland.c2me.opts.dfc.common.gen.BytecodeGen;
 import com.ishland.c2me.opts.dfc.common.vif.AstVanillaInterface;
 import com.ishland.c2me.opts.dfc.common.vif.NoisePosVanillaInterface;
-import com.ishland.flowsched.util.Assertions;
 import it.unimi.dsi.fastutil.Pair;
 import it.unimi.dsi.fastutil.ints.IntObjectPair;
 import net.minecraft.registry.entry.RegistryEntry;
@@ -220,12 +219,8 @@ public class SplineAstNode implements AstNode, ISingleInlineableAstNode {
                 );
                 m.store(rangeForLocation, Type.INT_TYPE);
 
-                int n = localVarConsumer.createLocalVariable("n", Type.FLOAT_TYPE.getDescriptor());
-                int o = localVarConsumer.createLocalVariable("o", Type.FLOAT_TYPE.getDescriptor());
-
                 Label lowerOutsideLabel = new Label();
                 Label upperOutsideLabel = new Label();
-                Label defaultLabel = new Label();
                 Label label3 = new Label();
                 int middleCount = valuesMethods.length - 1;
                 Label[] middleLabels = new Label[middleCount];
@@ -240,16 +235,16 @@ public class SplineAstNode implements AstNode, ISingleInlineableAstNode {
 
                 // findRangeForLocation returns -1 below the first location, lastConst above
                 // the last location, and [0, lastConst) for interpolated ranges.
+                m.load(point, Type.FLOAT_TYPE);
                 m.load(rangeForLocation, Type.INT_TYPE);
                 m.tableswitch(
                         -1,
                         lastConst,
-                        defaultLabel,
+                        lowerOutsideLabel,
                         jumpLabels
                 );
 
                 m.visitLabel(lowerOutsideLabel);
-                m.load(point, Type.FLOAT_TYPE);
                 m.load(locArr, InstructionAdapter.OBJECT_TYPE);
                 callSplineSingle(context, m, valuesMethods[0]);
                 m.load(derArr, InstructionAdapter.OBJECT_TYPE);
@@ -263,7 +258,6 @@ public class SplineAstNode implements AstNode, ISingleInlineableAstNode {
                 m.areturn(Type.FLOAT_TYPE);
 
                 m.visitLabel(upperOutsideLabel);
-                m.load(point, Type.FLOAT_TYPE);
                 m.load(locArr, InstructionAdapter.OBJECT_TYPE);
                 callSplineSingle(context, m, valuesMethods[lastConst]);
                 m.load(derArr, InstructionAdapter.OBJECT_TYPE);
@@ -289,40 +283,21 @@ public class SplineAstNode implements AstNode, ISingleInlineableAstNode {
                     callSplineSingle(context, m, valuesMethods[i]);
                     if (valuesMethods[i].equals(valuesMethods[i + 1])) { // splines are pure
                         m.dup();
-                        m.store(n, Type.FLOAT_TYPE);
-                        m.store(o, Type.FLOAT_TYPE);
                     } else {
-                        m.store(n, Type.FLOAT_TYPE);
                         callSplineSingle(context, m, valuesMethods[i + 1]);
-                        m.store(o, Type.FLOAT_TYPE);
                     }
                     m.goTo(label3);
                 }
 
-                m.visitLabel(defaultLabel);
-                m.iconst(0);
-                m.aconst("boom");
-                m.invokestatic(
-                        Type.getInternalName(Assertions.class),
-                        "assertTrue",
-                        Type.getMethodDescriptor(Type.VOID_TYPE, Type.BOOLEAN_TYPE, Type.getType(String.class)),
-                        false
-                );
-                m.fconst(Float.NaN); // unreachable code
-                m.areturn(Type.FLOAT_TYPE);
-
                 m.visitLabel(label3);
 
-                m.load(point, Type.FLOAT_TYPE);
                 m.load(locArr, InstructionAdapter.OBJECT_TYPE);
                 m.load(derArr, InstructionAdapter.OBJECT_TYPE);
                 m.load(rangeForLocation, Type.INT_TYPE);
-                m.load(n, Type.FLOAT_TYPE);
-                m.load(o, Type.FLOAT_TYPE);
                 m.invokestatic(
                         Type.getInternalName(SplineSupport.class),
                         "sampleInsideRange",
-                        Type.getMethodDescriptor(Type.FLOAT_TYPE, Type.FLOAT_TYPE, Type.getType(float[].class), Type.getType(float[].class), Type.INT_TYPE, Type.FLOAT_TYPE, Type.FLOAT_TYPE),
+                        Type.getMethodDescriptor(Type.FLOAT_TYPE, Type.FLOAT_TYPE, Type.FLOAT_TYPE, Type.FLOAT_TYPE, Type.getType(float[].class), Type.getType(float[].class), Type.INT_TYPE),
                         false
                 );
                 m.areturn(Type.FLOAT_TYPE);

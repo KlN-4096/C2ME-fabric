@@ -25,7 +25,7 @@ public class SplineSupport {
         return f == 0.0F ? value : value + f * (point - locations[i]);
     }
 
-    public static float sampleInsideRange(float point, float[] locations, float[] derivatives, int i, float value0, float value1) {
+    public static float sampleInsideRange(float point, float value0, float value1, float[] locations, float[] derivatives, int i) {
         float loc0 = locations[i];
         float loc1 = locations[i + 1];
         float locDist = loc1 - loc0;
