@@ -10,6 +10,8 @@ import java.util.Objects;
 
 public abstract class AbstractUnaryNode implements AstNode {
 
+    private static final int UNARY_SELF_COST = 2;
+
     protected final AstNode operand;
 
     public AbstractUnaryNode(AstNode operand) {
@@ -19,6 +21,16 @@ public abstract class AbstractUnaryNode implements AstNode {
     @Override
     public AstNode[] getChildren() {
         return new AstNode[]{operand};
+    }
+
+    @Override
+    public int costSelf() {
+        return UNARY_SELF_COST;
+    }
+
+    @Override
+    public boolean YDependency() {
+        return this.operand.YDependency();
     }
 
     @Override

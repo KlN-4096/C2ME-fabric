@@ -11,6 +11,8 @@ import java.util.Objects;
 
 public class RootNode implements AstNode {
 
+    private static final int DEFAULT_SELF_COST = 8;
+
     private final AstNode next;
 
     public RootNode(AstNode next) {
@@ -30,6 +32,16 @@ public class RootNode implements AstNode {
     @Override
     public AstNode[] getChildren() {
         return new AstNode[]{next};
+    }
+
+    @Override
+    public int costSelf() {
+        return DEFAULT_SELF_COST;
+    }
+
+    @Override
+    public boolean YDependency() {
+        return this.next.YDependency();
     }
 
     @Override

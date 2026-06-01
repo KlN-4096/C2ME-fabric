@@ -14,6 +14,8 @@ import java.util.Objects;
 
 public class DFTNoiseNode implements AstNode, ISingleInlineableAstNode {
 
+    private static final int NOISE_COST = 1024;
+
     private final DensityFunction.Noise noise;
     private final double xzScale;
     private final double yScale;
@@ -39,6 +41,16 @@ public class DFTNoiseNode implements AstNode, ISingleInlineableAstNode {
     @Override
     public AstNode[] getChildren() {
         return new AstNode[0];
+    }
+
+    @Override
+    public int costSelf() {
+        return NOISE_COST;
+    }
+
+    @Override
+    public boolean YDependency() {
+        return this.yScale != 0.0;
     }
 
     @Override

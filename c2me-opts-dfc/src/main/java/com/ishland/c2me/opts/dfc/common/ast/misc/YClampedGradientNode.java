@@ -12,6 +12,8 @@ import org.objectweb.asm.commons.InstructionAdapter;
 
 public class YClampedGradientNode implements AstNode, ISingleInlineableAstNode {
 
+    private static final int Y_GRADIENT_COST = 5;
+
     private final double fromY;
     private final double toY;
     private final double fromValue;
@@ -39,6 +41,16 @@ public class YClampedGradientNode implements AstNode, ISingleInlineableAstNode {
     @Override
     public AstNode[] getChildren() {
         return new AstNode[0];
+    }
+
+    @Override
+    public int costSelf() {
+        return Y_GRADIENT_COST;
+    }
+
+    @Override
+    public boolean YDependency() {
+        return true;
     }
 
     @Override

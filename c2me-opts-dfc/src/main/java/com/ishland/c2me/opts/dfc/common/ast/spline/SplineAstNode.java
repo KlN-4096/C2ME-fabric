@@ -25,6 +25,11 @@ import java.util.function.UnaryOperator;
 
 public class SplineAstNode implements AstNode, ISingleInlineableAstNode {
 
+    private static final int DEFAULT_SELF_COST = 8;
+    private static final int SPLINE_SELF_COST = 12;
+    private static final int SPLINE_FIXED_VALUE_COST = 1;
+    private static final int SPLINE_VALUE_SAMPLE_MULTIPLIER = 2;
+
     public static final String SPLINE_METHOD_DESC = Type.getMethodDescriptor(Type.getType(float.class), Type.getType(int.class), Type.getType(int.class), Type.getType(int.class), Type.getType(EvalType.class));
     private final Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> spline;
 
@@ -111,6 +116,58 @@ public class SplineAstNode implements AstNode, ISingleInlineableAstNode {
     @Override
     public AstNode[] getChildren() {
         return new AstNode[0];
+    }
+
+    @Override
+    public int costSelf() {
+        return estimateSplineCost(this.spline);
+    }
+
+    @Override
+    public boolean YDependency() {
+        return isSplineYDependent(this.spline);
+    }
+
+    @Override
+    public int cost() {
+        return this.costSelf();
+    }
+
+    private static int estimateSplineCost(Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> spline) {
+        if (spline instanceof Spline.FixedFloatFunction<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper>) {
+            return SPLINE_FIXED_VALUE_COST;
+        }
+        if (spline instanceof Spline.Implementation<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> impl) {
+            int locationCost = McToAst.toAst(impl.locationFunction().function().value()).cost();
+            return SPLINE_SELF_COST + SPLINE_VALUE_SAMPLE_MULTIPLIER * averageValueCost(impl) + locationCost;
+        }
+        return DEFAULT_SELF_COST;
+    }
+
+    private static int averageValueCost(Spline.Implementation<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> impl) {
+        int total = 0;
+        for (Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> value : impl.values()) {
+            total += estimateSplineCost(value);
+        }
+        return impl.values().isEmpty() ? 0 : total / impl.values().size();
+    }
+
+    private static boolean isSplineYDependent(Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> spline) {
+        if (spline instanceof Spline.FixedFloatFunction<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper>) {
+            return false;
+        }
+        if (spline instanceof Spline.Implementation<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> impl) {
+            if (McToAst.toAst(impl.locationFunction().function().value()).YDependency()) {
+                return true;
+            }
+            for (Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> value : impl.values()) {
+                if (isSplineYDependent(value)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return true;
     }
 
     @Override

@@ -12,6 +12,8 @@ import java.util.Objects;
 
 public class RangeChoiceNode implements AstNode {
 
+    private static final int RANGE_CHOICE_SELF_COST = 8;
+
     private final AstNode input;
     private final double minInclusive;
     private final double maxExclusive;
@@ -191,6 +193,16 @@ public class RangeChoiceNode implements AstNode {
     @Override
     public AstNode[] getChildren() {
         return new AstNode[]{this.input, this.whenInRange, this.whenOutOfRange};
+    }
+
+    @Override
+    public int costSelf() {
+        return RANGE_CHOICE_SELF_COST;
+    }
+
+    @Override
+    public boolean YDependency() {
+        return this.input.YDependency() || this.whenInRange.YDependency() || this.whenOutOfRange.YDependency();
     }
 
     @Override

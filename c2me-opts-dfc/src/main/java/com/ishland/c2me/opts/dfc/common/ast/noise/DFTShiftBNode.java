@@ -14,6 +14,8 @@ import java.util.Objects;
 
 public class DFTShiftBNode implements AstNode, ISingleInlineableAstNode {
 
+    private static final int SHIFT_NOISE_COST = 96;
+
     private final DensityFunction.Noise offsetNoise;
 
     public DFTShiftBNode(DensityFunction.Noise offsetNoise) {
@@ -35,6 +37,16 @@ public class DFTShiftBNode implements AstNode, ISingleInlineableAstNode {
     @Override
     public AstNode[] getChildren() {
         return new AstNode[0];
+    }
+
+    @Override
+    public int costSelf() {
+        return SHIFT_NOISE_COST;
+    }
+
+    @Override
+    public boolean YDependency() {
+        return false;
     }
 
     @Override

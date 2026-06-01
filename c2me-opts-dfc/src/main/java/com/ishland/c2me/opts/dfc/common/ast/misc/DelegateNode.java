@@ -18,6 +18,8 @@ import java.util.Objects;
 
 public class DelegateNode implements AstNode, ISingleInlineableAstNode {
 
+    private static final int DELEGATE_COST = 160;
+
 //    private static final ConcurrentHashMap<Class<?>, LongAdder> statistics = new ConcurrentHashMap<>();
 
     private final DensityFunction densityFunction;
@@ -44,6 +46,16 @@ public class DelegateNode implements AstNode, ISingleInlineableAstNode {
     @Override
     public AstNode[] getChildren() {
         return new AstNode[0];
+    }
+
+    @Override
+    public int costSelf() {
+        return DELEGATE_COST;
+    }
+
+    @Override
+    public boolean YDependency() {
+        return true;
     }
 
     @Override

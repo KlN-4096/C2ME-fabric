@@ -13,6 +13,18 @@ public interface AstNode {
 
     AstNode[] getChildren();
 
+    int costSelf();
+
+    boolean YDependency();
+
+    default int cost() {
+        int cost = this.costSelf();
+        for (AstNode child : this.getChildren()) {
+            cost += child.cost();
+        }
+        return cost;
+    }
+
     AstNode transform(AstTransformer transformer);
 
     void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer);

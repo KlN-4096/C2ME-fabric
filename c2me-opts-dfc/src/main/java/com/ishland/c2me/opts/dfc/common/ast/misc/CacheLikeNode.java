@@ -8,6 +8,7 @@ import com.ishland.c2me.opts.dfc.common.gen.BytecodeGen;
 import com.ishland.c2me.opts.dfc.common.gen.IMultiMethod;
 import com.ishland.c2me.opts.dfc.common.gen.ISingleMethod;
 import com.ishland.c2me.opts.dfc.common.gen.SubCompiledDensityFunction;
+import net.minecraft.world.gen.chunk.ChunkNoiseSampler;
 import net.minecraft.world.gen.densityfunction.DensityFunction;
 import net.minecraft.world.gen.densityfunction.DensityFunctionTypes;
 import org.objectweb.asm.Handle;
@@ -19,6 +20,8 @@ import org.objectweb.asm.commons.InstructionAdapter;
 import java.util.Objects;
 
 public class CacheLikeNode implements AstNode {
+
+    private static final int CACHE_QUERY_COST = 4;
 
     private final IFastCacheLike cacheLike;
     private final AstNode delegate;
@@ -59,6 +62,54 @@ public class CacheLikeNode implements AstNode {
     @Override
     public AstNode[] getChildren() {
         return new AstNode[]{this.delegate};
+    }
+
+    @Override
+    public int costSelf() {
+        return this.cacheLike == null ? 0 : CACHE_QUERY_COST;
+    }
+
+    @Override
+    public int cost() {
+        return this.cacheLike == null ? this.delegate.cost() : this.costSelf();
+    }
+
+    @Override
+    public boolean YDependency() {
+        return !isYIndependentCache();
+    }
+
+    public boolean hasSideEffects() {
+        return this.cacheLike != null && !isRebuildableCache(this.cacheLike);
+    }
+
+    private boolean isYIndependentCache() {
+        if (this.cacheLike == null) {
+            return !this.delegate.YDependency();
+        }
+        return is2DCache(this.cacheLike);
+    }
+
+    private static boolean isRebuildableCache(IFastCacheLike cacheLike) {
+        if ((Object) cacheLike instanceof ChunkNoiseSampler.CacheOnce || (Object) cacheLike instanceof ChunkNoiseSampler.Cache2D) {
+            return true;
+        }
+        if ((Object) cacheLike instanceof DensityFunctionTypes.Wrapper wrapper) {
+            return wrapper.type() == DensityFunctionTypes.Wrapping.Type.CACHE_ONCE
+                    || wrapper.type() == DensityFunctionTypes.Wrapping.Type.CACHE2D;
+        }
+        return false;
+    }
+
+    private static boolean is2DCache(IFastCacheLike cacheLike) {
+        if ((Object) cacheLike instanceof ChunkNoiseSampler.Cache2D || (Object) cacheLike instanceof ChunkNoiseSampler.FlatCache) {
+            return true;
+        }
+        if ((Object) cacheLike instanceof DensityFunctionTypes.Wrapper wrapper) {
+            return wrapper.type() == DensityFunctionTypes.Wrapping.Type.CACHE2D
+                    || wrapper.type() == DensityFunctionTypes.Wrapping.Type.FLAT_CACHE;
+        }
+        return false;
     }
 
     @Override

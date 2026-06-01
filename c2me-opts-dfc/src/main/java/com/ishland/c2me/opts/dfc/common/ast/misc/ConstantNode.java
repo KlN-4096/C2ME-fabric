@@ -12,6 +12,8 @@ import java.util.Arrays;
 
 public class ConstantNode implements AstNode, ISingleInlineableAstNode {
 
+    private static final int CONSTANT_COST = 1;
+
     private final double value;
 
     public ConstantNode(double value) {
@@ -31,6 +33,16 @@ public class ConstantNode implements AstNode, ISingleInlineableAstNode {
     @Override
     public AstNode[] getChildren() {
         return new AstNode[0];
+    }
+
+    @Override
+    public int costSelf() {
+        return CONSTANT_COST;
+    }
+
+    @Override
+    public boolean YDependency() {
+        return false;
     }
 
     @Override

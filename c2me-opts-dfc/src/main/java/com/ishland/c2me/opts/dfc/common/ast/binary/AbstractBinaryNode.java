@@ -10,6 +10,8 @@ import java.util.Objects;
 
 public abstract class AbstractBinaryNode implements AstNode {
 
+    private static final int BINARY_SELF_COST = 3;
+
     protected final AstNode left;
     protected final AstNode right;
 
@@ -21,6 +23,16 @@ public abstract class AbstractBinaryNode implements AstNode {
     @Override
     public AstNode[] getChildren() {
         return new AstNode[]{left, right};
+    }
+
+    @Override
+    public int costSelf() {
+        return BINARY_SELF_COST;
+    }
+
+    @Override
+    public boolean YDependency() {
+        return this.left.YDependency() || this.right.YDependency();
     }
 
     @Override

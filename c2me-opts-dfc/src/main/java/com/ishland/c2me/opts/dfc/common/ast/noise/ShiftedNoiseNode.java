@@ -14,6 +14,8 @@ import java.util.Objects;
 
 public class ShiftedNoiseNode implements AstNode {
 
+    private static final int SHIFT_NOISE_COST = 96;
+
     private final AstNode shiftX;
     private final AstNode shiftY;
     private final AstNode shiftZ;
@@ -58,6 +60,16 @@ public class ShiftedNoiseNode implements AstNode {
     @Override
     public AstNode[] getChildren() {
         return new AstNode[]{this.shiftX, this.shiftY, this.shiftZ};
+    }
+
+    @Override
+    public int costSelf() {
+        return SHIFT_NOISE_COST;
+    }
+
+    @Override
+    public boolean YDependency() {
+        return this.yScale != 0.0 || this.shiftX.YDependency() || this.shiftY.YDependency() || this.shiftZ.YDependency();
     }
 
     @Override

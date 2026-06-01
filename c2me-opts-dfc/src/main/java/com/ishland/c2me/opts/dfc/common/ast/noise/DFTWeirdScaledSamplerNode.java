@@ -16,6 +16,8 @@ import java.util.Objects;
 
 public class DFTWeirdScaledSamplerNode implements AstNode {
 
+    private static final int WEIRD_SCALED_SAMPLER_COST = 128;
+
     private final AstNode input;
     private final DensityFunction.Noise noise;
     private final DensityFunctionTypes.WeirdScaledSampler.RarityValueMapper mapper;
@@ -45,6 +47,16 @@ public class DFTWeirdScaledSamplerNode implements AstNode {
     @Override
     public AstNode[] getChildren() {
         return new AstNode[]{this.input};
+    }
+
+    @Override
+    public int costSelf() {
+        return WEIRD_SCALED_SAMPLER_COST;
+    }
+
+    @Override
+    public boolean YDependency() {
+        return true;
     }
 
     @Override
