@@ -57,7 +57,7 @@ public class MulNode extends AbstractBinaryNode implements ISingleInlineableAstN
         m.goTo(end);
 
         m.visitLabel(notZero);
-        AstNode.operandCallByteCodeGen(this.right, context, m, localVarConsumer);
+        context.withoutLocalCse(() -> AstNode.operandCallByteCodeGen(this.right, context, m, localVarConsumer));
         m.mul(Type.DOUBLE_TYPE);
         m.visitLabel(end);
     }

@@ -13,6 +13,13 @@ public interface AstNode {
 
     AstNode[] getChildren();
 
+    default AstNode withChildren(AstNode[] children) {
+        if (children.length == 0) {
+            return this;
+        }
+        throw new UnsupportedOperationException("Cannot rebuild " + this.getClass().getName() + " with children");
+    }
+
     int costSelf();
 
     boolean YDependency();
@@ -25,6 +32,14 @@ public interface AstNode {
         return cost;
     }
 
+    default int cachePlacementCost() {
+        int cost = this.costSelf();
+        for (AstNode child : this.getChildren()) {
+            cost += child.cachePlacementCost();
+        }
+        return cost;
+    }
+
     AstNode transform(AstTransformer transformer);
 
     void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer);
@@ -32,6 +47,13 @@ public interface AstNode {
     void doBytecodeGenMulti(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer);
 
     static void operandCallByteCodeGen(AstNode operand, BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
+        if (context.emitLocalCseSingle(operand, m, localVarConsumer)) {
+            return;
+        }
+        emitOperandSingleRaw(operand, context, m, localVarConsumer);
+    }
+
+    static void emitOperandSingleRaw(AstNode operand, BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
         if (operand instanceof ISingleInlineableAstNode inlineable) {
             inlineable.emitValueSingle(context, m, localVarConsumer);
         } else {

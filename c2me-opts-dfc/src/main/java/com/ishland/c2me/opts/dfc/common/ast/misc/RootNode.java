@@ -35,6 +35,14 @@ public class RootNode implements AstNode {
     }
 
     @Override
+    public AstNode withChildren(AstNode[] children) {
+        if (children.length != 1) {
+            throw new IllegalArgumentException("Expected 1 child for " + this.getClass().getName() + ", got " + children.length);
+        }
+        return new RootNode(children[0]);
+    }
+
+    @Override
     public int costSelf() {
         return DEFAULT_SELF_COST;
     }

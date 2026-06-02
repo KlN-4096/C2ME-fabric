@@ -24,6 +24,14 @@ public abstract class AbstractUnaryNode implements AstNode {
     }
 
     @Override
+    public AstNode withChildren(AstNode[] children) {
+        if (children.length != 1) {
+            throw new IllegalArgumentException("Expected 1 child for " + this.getClass().getName() + ", got " + children.length);
+        }
+        return newInstance(children[0]);
+    }
+
+    @Override
     public int costSelf() {
         return UNARY_SELF_COST;
     }

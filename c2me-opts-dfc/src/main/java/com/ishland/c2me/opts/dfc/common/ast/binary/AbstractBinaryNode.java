@@ -26,6 +26,14 @@ public abstract class AbstractBinaryNode implements AstNode {
     }
 
     @Override
+    public AstNode withChildren(AstNode[] children) {
+        if (children.length != 2) {
+            throw new IllegalArgumentException("Expected 2 children for " + this.getClass().getName() + ", got " + children.length);
+        }
+        return newInstance(children[0], children[1]);
+    }
+
+    @Override
     public int costSelf() {
         return BINARY_SELF_COST;
     }

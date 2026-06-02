@@ -1,14 +1,18 @@
 package com.ishland.c2me.opts.dfc.common.ast;
 
 import com.ishland.c2me.opts.dfc.common.ast.opt.*;
+import com.ishland.c2me.opts.dfc.common.ast.opt.cache.DagCseOptimizer;
 
 public final class AstOptimizer {
-
     private static final int MAX_ITERATIONS = 10;
 
     private AstOptimizer() {}
 
     public static AstNode optimize(AstNode node) {
+        return DagCseOptimizer.optimize(node);
+    }
+
+    public static AstNode optimizeTree(AstNode node) {
         AstNode prev;
         int iterations = 0;
         do {

@@ -47,7 +47,7 @@ public class MinShortNode extends AbstractBinaryNode {
         m.areturn(Type.DOUBLE_TYPE);
 
         m.visitLabel(minLabel);
-        AstNode.operandCallByteCodeGen(this.right, context, m, localVarConsumer);
+        context.withLocalCse(this.right, () -> AstNode.operandCallByteCodeGen(this.right, context, m, localVarConsumer));
         m.invokestatic(
                 Type.getInternalName(Math.class),
                 "min",

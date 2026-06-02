@@ -196,6 +196,20 @@ public class RangeChoiceNode implements AstNode {
     }
 
     @Override
+    public AstNode withChildren(AstNode[] children) {
+        if (children.length != 3) {
+            throw new IllegalArgumentException("Expected 3 children for " + this.getClass().getName() + ", got " + children.length);
+        }
+        return new RangeChoiceNode(
+                children[0],
+                this.minInclusive,
+                this.maxExclusive,
+                children[1],
+                children[2]
+        );
+    }
+
+    @Override
     public int costSelf() {
         return RANGE_CHOICE_SELF_COST;
     }
@@ -238,7 +252,7 @@ public class RangeChoiceNode implements AstNode {
         if (this.whenInRange.equals(this.input)) {
             m.load(inputValue, Type.DOUBLE_TYPE);
         } else {
-            AstNode.operandCallByteCodeGen(this.whenInRange, context, m, localVarConsumer);
+            context.withLocalCse(this.whenInRange, () -> AstNode.operandCallByteCodeGen(this.whenInRange, context, m, localVarConsumer));
         }
         m.goTo(end);
 
@@ -246,7 +260,7 @@ public class RangeChoiceNode implements AstNode {
         if (this.whenOutOfRange.equals(this.input)) {
             m.load(inputValue, Type.DOUBLE_TYPE);
         } else {
-            AstNode.operandCallByteCodeGen(this.whenOutOfRange, context, m, localVarConsumer);
+            context.withLocalCse(this.whenOutOfRange, () -> AstNode.operandCallByteCodeGen(this.whenOutOfRange, context, m, localVarConsumer));
         }
 
         m.visitLabel(end);

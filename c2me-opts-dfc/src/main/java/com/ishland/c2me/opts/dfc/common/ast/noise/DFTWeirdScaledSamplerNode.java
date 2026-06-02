@@ -50,6 +50,18 @@ public class DFTWeirdScaledSamplerNode implements AstNode {
     }
 
     @Override
+    public AstNode withChildren(AstNode[] children) {
+        if (children.length != 1) {
+            throw new IllegalArgumentException("Expected 1 child for " + this.getClass().getName() + ", got " + children.length);
+        }
+        return newInstance(children[0]);
+    }
+
+    protected AstNode newInstance(AstNode input) {
+        return new DFTWeirdScaledSamplerNode(input, this.noise, this.mapper);
+    }
+
+    @Override
     public int costSelf() {
         return WEIRD_SCALED_SAMPLER_COST;
     }
@@ -65,7 +77,7 @@ public class DFTWeirdScaledSamplerNode implements AstNode {
         if (input == this.input) {
             return transformer.transform(this);
         } else {
-            return transformer.transform(new DFTWeirdScaledSamplerNode(input, this.noise, this.mapper));
+            return transformer.transform(newInstance(input));
         }
     }
 

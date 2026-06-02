@@ -18,6 +18,7 @@ import net.minecraft.world.gen.densityfunction.DensityFunctionTypes;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Function;
 
 public final class SplineArithmeticOptimization implements AstTransformer {
 
@@ -164,6 +165,13 @@ public final class SplineArithmeticOptimization implements AstTransformer {
     public static Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> optimizeLocationAffine(
             Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> spline
     ) {
+        return optimizeLocationAffine(spline, McToAst::toAst);
+    }
+
+    public static Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> optimizeLocationAffine(
+            Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> spline,
+            Function<DensityFunction, AstNode> locationAstResolver
+    ) {
         if (!(spline instanceof Spline.Implementation<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> impl)) {
             return spline;
         }
@@ -171,14 +179,14 @@ public final class SplineArithmeticOptimization implements AstTransformer {
         boolean changed = false;
         List<Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper>> optimizedValues = new ArrayList<>(impl.values().size());
         for (Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> value : impl.values()) {
-            Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> optimizedValue = optimizeLocationAffine(value);
+            Spline<DensityFunctionTypes.Spline.SplinePos, DensityFunctionTypes.Spline.DensityFunctionWrapper> optimizedValue = optimizeLocationAffine(value, locationAstResolver);
             optimizedValues.add(optimizedValue);
             changed |= optimizedValue != value;
         }
 
         DensityFunction originalLocationFunction = impl.locationFunction().function().value();
-        AstNode originalLocationAst = McToAst.toAst(originalLocationFunction);
-        AstNode locationAst = AstOptimizer.optimize(originalLocationAst);
+        AstNode originalLocationAst = locationAstResolver.apply(originalLocationFunction);
+        AstNode locationAst = AstOptimizer.optimizeTree(originalLocationAst);
         boolean locationOptimized = locationAst != originalLocationAst;
         float[] locations = impl.locations();
         float[] derivatives = impl.derivatives();

@@ -14,7 +14,7 @@ import java.util.Objects;
 
 public class ShiftedNoiseNode implements AstNode {
 
-    private static final int SHIFT_NOISE_COST = 96;
+    private static final int SHIFT_NOISE_COST = 1024 + 24;
 
     private final AstNode shiftX;
     private final AstNode shiftY;
@@ -63,6 +63,18 @@ public class ShiftedNoiseNode implements AstNode {
     }
 
     @Override
+    public AstNode withChildren(AstNode[] children) {
+        if (children.length != 3) {
+            throw new IllegalArgumentException("Expected 3 children for " + this.getClass().getName() + ", got " + children.length);
+        }
+        return newInstance(children[0], children[1], children[2]);
+    }
+
+    protected AstNode newInstance(AstNode shiftX, AstNode shiftY, AstNode shiftZ) {
+        return new ShiftedNoiseNode(shiftX, shiftY, shiftZ, this.xzScale, this.yScale, this.noise);
+    }
+
+    @Override
     public int costSelf() {
         return SHIFT_NOISE_COST;
     }
@@ -80,7 +92,7 @@ public class ShiftedNoiseNode implements AstNode {
         if (shiftX == this.shiftX && shiftY == this.shiftY && shiftZ == this.shiftZ) {
             return transformer.transform(this);
         } else {
-            return transformer.transform(new ShiftedNoiseNode(shiftX, shiftY, shiftZ, xzScale, yScale, noise));
+            return transformer.transform(newInstance(shiftX, shiftY, shiftZ));
         }
     }
 

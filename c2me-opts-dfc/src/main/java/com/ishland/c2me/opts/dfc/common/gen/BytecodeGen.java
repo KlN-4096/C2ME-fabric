@@ -4,10 +4,15 @@ import com.ishland.c2me.opts.dfc.common.ast.AstNode;
 import com.ishland.c2me.opts.dfc.common.ast.AstOptimizer;
 import com.ishland.c2me.opts.dfc.common.ast.EvalType;
 import com.ishland.c2me.opts.dfc.common.ast.McToAst;
+import com.ishland.c2me.opts.dfc.common.ast.binary.MaxShortNode;
+import com.ishland.c2me.opts.dfc.common.ast.binary.MinShortNode;
 import com.ishland.c2me.opts.dfc.common.ast.dfvisitor.StripBlending;
 import com.ishland.c2me.opts.dfc.common.ast.misc.CacheLikeNode;
 import com.ishland.c2me.opts.dfc.common.ast.misc.ConstantNode;
+import com.ishland.c2me.opts.dfc.common.ast.misc.RangeChoiceNode;
 import com.ishland.c2me.opts.dfc.common.ast.misc.RootNode;
+import com.ishland.c2me.opts.dfc.common.ast.opt.cache.DagCseOptimizer;
+import com.ishland.c2me.opts.dfc.common.ducks.ISingleInlineableAstNode;
 import com.ishland.c2me.opts.dfc.common.ast.spline.SplineAstNode;
 import com.ishland.c2me.opts.dfc.common.util.ArrayCache;
 import com.ishland.c2me.opts.dfc.common.vif.AstVanillaInterface;
@@ -37,8 +42,10 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
@@ -104,7 +111,7 @@ public class BytecodeGen {
         RootNode rootNode = new RootNode(node);
 
         Context genContext = new Context(writer, name, requiresPostProcessing);
-        genContext.newSingleMethod0((adapter, localVarConsumer) -> rootNode.doBytecodeGenSingle(genContext, adapter, localVarConsumer), "evalSingle", true);
+        genContext.newSingleMethod0(rootNode, (adapter, localVarConsumer) -> rootNode.doBytecodeGenSingle(genContext, adapter, localVarConsumer), "evalSingle", true);
         genContext.newMultiMethod0((adapter, localVarConsumer) -> rootNode.doBytecodeGenMulti(genContext, adapter, localVarConsumer), "evalMulti", true);
         if (requiresPostProcessing) {
             genPostProcessAll(genContext);
@@ -128,9 +135,7 @@ public class BytecodeGen {
         genGetArgs(genContext);
         genNewInstance(genContext);
         genNewRawInstance(genContext);
-        if (requiresPostProcessing) {
-            genPostProcessField(genContext);
-        }
+        genPostProcessField(genContext);
 //        genFields(genContext);
 
         ListIterator<Object> iterator = args.listIterator();
@@ -221,6 +226,15 @@ public class BytecodeGen {
 
         m.load(0, InstructionAdapter.OBJECT_TYPE);
         m.invokespecial(Type.getInternalName(Object.class), "<init>", Type.getMethodDescriptor(Type.VOID_TYPE), false);
+
+        for (Context.InternalFieldRecord field : context.internalFields) {
+            if (field.initialValue() == null) {
+                continue;
+            }
+            m.load(0, InstructionAdapter.OBJECT_TYPE);
+            m.visitLdcInsn(field.initialValue());
+            m.putfield(context.className, field.name(), Type.getDescriptor(field.type()));
+        }
 
         for (Map.Entry<Object, Context.FieldRecord> entry : context.args.entrySet().stream().sorted(Comparator.comparingInt(o -> o.getValue().ordinal())).toList()) {
             String name = entry.getValue().name();
@@ -471,6 +485,18 @@ public class BytecodeGen {
 
     private static void dumpClass(String className, byte[] bytes) {
         File outputFile = new File(exportDir, className + ".class");
+        writeClass(outputFile, bytes);
+    }
+
+    private static String sanitizeDebugLabel(String label) {
+        String trimmed = label.trim();
+        if (trimmed.isEmpty()) {
+            return "unlabeled";
+        }
+        return trimmed.replaceAll("[^A-Za-z0-9._-]", "_");
+    }
+
+    private static void writeClass(File outputFile, byte[] bytes) {
         outputFile.getParentFile().mkdirs();
         try {
             com.google.common.io.Files.write(bytes, outputFile);
@@ -507,11 +533,15 @@ public class BytecodeGen {
         private final boolean requiresPostProcessing;
         private int methodIdx = 0;
         private final Object2ReferenceOpenHashMap<AstNode, String> singleMethods = new Object2ReferenceOpenHashMap<>();
+        private final Object2ReferenceOpenHashMap<String, AstNode> singleMethodRoots = new Object2ReferenceOpenHashMap<>();
         private final Object2ReferenceOpenHashMap<AstNode, String> multiMethods = new Object2ReferenceOpenHashMap<>();
         private final Object2ReferenceOpenHashMap<SplineAstNode, String> splineMethods = new Object2ReferenceOpenHashMap<>();
         private final ObjectOpenHashSet<String> postProcessMethods = new ObjectOpenHashSet<>();
         private final Reference2ObjectOpenHashMap<Object, FieldRecord> args = new Reference2ObjectOpenHashMap<>();
         private final Object2ReferenceOpenHashMap<FloatArrayKey, FieldRecord> floatArrayArgs = new Object2ReferenceOpenHashMap<>();
+        private final List<InternalFieldRecord> internalFields = new ArrayList<>();
+        private int internalFieldIdx = 0;
+        private LocalCseState localCseState;
 
         public Context(ClassWriter classWriter, String className, boolean requiresPostProcessing) {
             this.classWriter = Objects.requireNonNull(classWriter);
@@ -538,7 +568,7 @@ public class BytecodeGen {
                 if (node instanceof CacheLikeNode cacheLikeNode) {
                     suffix += cacheLikeNode.getCacheLike().c2me$getName();
                 }
-                return this.newSingleMethod((adapter, localVarConsumer) -> node1.doBytecodeGenSingle(this, adapter, localVarConsumer), nextMethodName(suffix));
+                return this.newSingleMethod(node1, (adapter, localVarConsumer) -> node1.doBytecodeGenSingle(this, adapter, localVarConsumer), nextMethodName(suffix));
             });
         }
 
@@ -551,7 +581,19 @@ public class BytecodeGen {
             return name;
         }
 
+        private String newSingleMethod(AstNode node, BiConsumer<InstructionAdapter, LocalVarConsumer> generator, String name) {
+            newSingleMethod0(node, generator, name, false);
+            return name;
+        }
+
         private void newSingleMethod0(BiConsumer<InstructionAdapter, LocalVarConsumer> generator, String name, boolean isPublic) {
+            newSingleMethod0(null, generator, name, isPublic);
+        }
+
+        private void newSingleMethod0(AstNode root, BiConsumer<InstructionAdapter, LocalVarConsumer> generator, String name, boolean isPublic) {
+            if (root != null) {
+                this.singleMethodRoots.put(name, root);
+            }
             InstructionAdapter adapter = new InstructionAdapter(
                     new AnalyzerAdapter(
                             this.className,
@@ -572,12 +614,18 @@ public class BytecodeGen {
             Label start = new Label();
             Label end = new Label();
             adapter.visitLabel(start);
-            generator.accept(adapter, (localName, localDesc) -> {
-                int ordinal = nextLocalSlot[0];
-                nextLocalSlot[0] += Type.getType(localDesc).getSize();
-                extraLocals.add(IntObjectPair.of(ordinal, Pair.of(localName, localDesc)));
-                return ordinal;
-            });
+            LocalCseState prevCseState = this.localCseState;
+            this.localCseState = root != null ? LocalCseState.create(root) : null;
+            try {
+                generator.accept(adapter, (localName, localDesc) -> {
+                    int ordinal = nextLocalSlot[0];
+                    nextLocalSlot[0] += Type.getType(localDesc).getSize();
+                    extraLocals.add(IntObjectPair.of(ordinal, Pair.of(localName, localDesc)));
+                    return ordinal;
+                });
+            } finally {
+                this.localCseState = prevCseState;
+            }
             adapter.visitLabel(end);
             adapter.visitLocalVariable("this", this.classDesc, null, start, end, 0);
             adapter.visitLocalVariable("x", Type.INT_TYPE.getDescriptor(), null, start, end, 1);
@@ -588,6 +636,51 @@ public class BytecodeGen {
                 adapter.visitLocalVariable(local.right().left(), local.right().right(), null, start, end, local.leftInt());
             }
             adapter.visitMaxs(0, 0);
+        }
+
+        public boolean emitLocalCseSingle(AstNode operand, InstructionAdapter m, LocalVarConsumer localVarConsumer) {
+            LocalCseState state = this.localCseState;
+            if (state == null || !state.shouldMaterialize(operand)) {
+                return false;
+            }
+            Integer local = state.locals.get(operand);
+            if (local == null) {
+                local = localVarConsumer.createLocalVariable(localCseName(operand), Type.DOUBLE_TYPE.getDescriptor());
+                state.locals.put(operand, local);
+                state.emitting.put(operand, Boolean.TRUE);
+                try {
+                    withLocalCse(operand, () -> AstNode.emitOperandSingleRaw(operand, this, m, localVarConsumer));
+                } finally {
+                    state.emitting.remove(operand);
+                }
+                m.store(local, Type.DOUBLE_TYPE);
+            }
+            m.load(local, Type.DOUBLE_TYPE);
+            return true;
+        }
+
+        private static String localCseName(AstNode operand) {
+            return "V" + String.format(Locale.ROOT, "%08x", operand.hashCode()).substring(0, 4);
+        }
+
+        public void withoutLocalCse(Runnable runnable) {
+            LocalCseState prevCseState = this.localCseState;
+            this.localCseState = null;
+            try {
+                runnable.run();
+            } finally {
+                this.localCseState = prevCseState;
+            }
+        }
+
+        public void withLocalCse(AstNode root, Runnable runnable) {
+            LocalCseState prevCseState = this.localCseState;
+            this.localCseState = root != null ? LocalCseState.create(root) : null;
+            try {
+                runnable.run();
+            } finally {
+                this.localCseState = prevCseState;
+            }
         }
 
         public String newMultiMethod(AstNode node) {
@@ -698,6 +791,23 @@ public class BytecodeGen {
             return name;
         }
 
+        public String newInternalField(Class<?> type, String prefix) {
+            return newInternalField(type, prefix, null);
+        }
+
+        public String newInternalField(Class<?> type, String prefix, Object initialValue) {
+            String name = String.format("%s_%d", prefix, this.internalFieldIdx++);
+            this.classWriter.visitField(Opcodes.ACC_PRIVATE, name, Type.getDescriptor(type), null, null);
+            this.internalFields.add(new InternalFieldRecord(name, type, initialValue));
+            return name;
+        }
+
+        public String fieldDebugName(Object data, String suffix) {
+            FieldRecord field = this.args.get(data);
+            String fieldName = field != null ? field.name() : "unbound";
+            return this.className + "." + fieldName + "." + sanitizeDebugLabel(suffix);
+        }
+
         private List<FieldRecord> getFields() {
             List<FieldRecord> fields = new ArrayList<>(this.args.values());
             fields.sort(Comparator.comparingInt(FieldRecord::ordinal));
@@ -790,6 +900,63 @@ public class BytecodeGen {
         }
 
         private static record FieldRecord(String name, int ordinal, Class<?> type) {
+        }
+
+        private static record InternalFieldRecord(String name, Class<?> type, Object initialValue) {
+        }
+
+        private static final class LocalCseState {
+
+            private final IdentityHashMap<AstNode, Integer> counts;
+            private final IdentityHashMap<AstNode, Integer> locals = new IdentityHashMap<>();
+            private final IdentityHashMap<AstNode, Boolean> emitting = new IdentityHashMap<>();
+
+            private LocalCseState(IdentityHashMap<AstNode, Integer> counts) {
+                this.counts = counts;
+            }
+
+            private static LocalCseState create(AstNode root) {
+                IdentityHashMap<AstNode, Integer> counts = new IdentityHashMap<>();
+                countInSingleScope(root, counts);
+                return new LocalCseState(counts);
+            }
+
+            private boolean shouldMaterialize(AstNode node) {
+                if (this.emitting.containsKey(node)) {
+                    return false;
+                }
+                return this.counts.getOrDefault(node, 0) > 1 && node.cost() >= DagCseOptimizer.CACHE2D_THRESHOLD;
+            }
+
+            private static void countInSingleScope(AstNode node, IdentityHashMap<AstNode, Integer> counts) {
+                if (node instanceof SplineAstNode) {
+                    return;
+                }
+                counts.merge(node, 1, Integer::sum);
+                if (node instanceof RangeChoiceNode rangeChoiceNode) {
+                    countSingleOperand(rangeChoiceNode.getInput(), counts);
+                    return;
+                }
+                if (node instanceof MaxShortNode maxShortNode) {
+                    countSingleOperand(maxShortNode.getLeft(), counts);
+                    return;
+                }
+                if (node instanceof MinShortNode minShortNode) {
+                    countSingleOperand(minShortNode.getLeft(), counts);
+                    return;
+                }
+                for (AstNode child : node.getChildren()) {
+                    countSingleOperand(child, counts);
+                }
+            }
+
+            private static void countSingleOperand(AstNode node, IdentityHashMap<AstNode, Integer> counts) {
+                if (node instanceof ISingleInlineableAstNode) {
+                    countInSingleScope(node, counts);
+                } else {
+                    counts.merge(node, 1, Integer::sum);
+                }
+            }
         }
 
         private static final class FloatArrayKey {

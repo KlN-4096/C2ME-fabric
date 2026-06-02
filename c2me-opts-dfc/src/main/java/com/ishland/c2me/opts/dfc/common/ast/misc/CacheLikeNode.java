@@ -8,7 +8,6 @@ import com.ishland.c2me.opts.dfc.common.gen.BytecodeGen;
 import com.ishland.c2me.opts.dfc.common.gen.IMultiMethod;
 import com.ishland.c2me.opts.dfc.common.gen.ISingleMethod;
 import com.ishland.c2me.opts.dfc.common.gen.SubCompiledDensityFunction;
-import net.minecraft.world.gen.chunk.ChunkNoiseSampler;
 import net.minecraft.world.gen.densityfunction.DensityFunction;
 import net.minecraft.world.gen.densityfunction.DensityFunctionTypes;
 import org.objectweb.asm.Handle;
@@ -24,10 +23,12 @@ public class CacheLikeNode implements AstNode {
     private static final int CACHE_QUERY_COST = 4;
 
     private final IFastCacheLike cacheLike;
+    private final CacheTraits cacheTraits;
     private final AstNode delegate;
 
     public CacheLikeNode(IFastCacheLike cacheLike, AstNode delegate) {
         this.cacheLike = cacheLike;
+        this.cacheTraits = CacheTraits.of(cacheLike);
         this.delegate = Objects.requireNonNull(delegate);
     }
 
@@ -66,50 +67,40 @@ public class CacheLikeNode implements AstNode {
 
     @Override
     public int costSelf() {
-        return this.cacheLike == null ? 0 : CACHE_QUERY_COST;
+        return this.cacheTraits.hasCache() ? CACHE_QUERY_COST : 0;
     }
 
     @Override
     public int cost() {
-        return this.cacheLike == null ? this.delegate.cost() : this.costSelf();
+        return this.cacheTraits.hasCache() ? this.costSelf() : this.delegate.cost();
+    }
+
+    @Override
+    public int cachePlacementCost() {
+        if (this.isFlatCache()) {
+            return this.costSelf() + this.delegate.cachePlacementCost();
+        }
+        return this.cacheTraits.hasCache() ? this.cost() : this.delegate.cachePlacementCost();
     }
 
     @Override
     public boolean YDependency() {
-        return !isYIndependentCache();
+        if (!this.cacheTraits.hasCache()) {
+            return this.delegate.YDependency();
+        }
+        return !this.cacheTraits.isYIndependent();
     }
 
     public boolean hasSideEffects() {
-        return this.cacheLike != null && !isRebuildableCache(this.cacheLike);
+        return this.cacheTraits.hasSideEffects();
     }
 
-    private boolean isYIndependentCache() {
-        if (this.cacheLike == null) {
-            return !this.delegate.YDependency();
-        }
-        return is2DCache(this.cacheLike);
+    public boolean blocksCacheInsertion() {
+        return this.cacheTraits.blocksCacheInsertion();
     }
 
-    private static boolean isRebuildableCache(IFastCacheLike cacheLike) {
-        if ((Object) cacheLike instanceof ChunkNoiseSampler.CacheOnce || (Object) cacheLike instanceof ChunkNoiseSampler.Cache2D) {
-            return true;
-        }
-        if ((Object) cacheLike instanceof DensityFunctionTypes.Wrapper wrapper) {
-            return wrapper.type() == DensityFunctionTypes.Wrapping.Type.CACHE_ONCE
-                    || wrapper.type() == DensityFunctionTypes.Wrapping.Type.CACHE2D;
-        }
-        return false;
-    }
-
-    private static boolean is2DCache(IFastCacheLike cacheLike) {
-        if ((Object) cacheLike instanceof ChunkNoiseSampler.Cache2D || (Object) cacheLike instanceof ChunkNoiseSampler.FlatCache) {
-            return true;
-        }
-        if ((Object) cacheLike instanceof DensityFunctionTypes.Wrapper wrapper) {
-            return wrapper.type() == DensityFunctionTypes.Wrapping.Type.CACHE2D
-                    || wrapper.type() == DensityFunctionTypes.Wrapping.Type.FLAT_CACHE;
-        }
-        return false;
+    public boolean isFlatCache() {
+        return this.cacheTraits.isFlat();
     }
 
     @Override
@@ -124,20 +115,30 @@ public class CacheLikeNode implements AstNode {
 
     @Override
     public void doBytecodeGenSingle(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
+        if (this.cacheTraits.rebuilt() && this.cacheTraits.is2D()) {
+            doBytecodeGenSingleRebuilt2D(context, m, localVarConsumer);
+            return;
+        }
+        doBytecodeGenSingleDefault(context, m, localVarConsumer);
+    }
+
+    private void doBytecodeGenSingleDefault(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
         if (this.cacheLike == null) {
             AstNode.operandCallByteCodeGen(this.delegate, context, m, localVarConsumer);
             m.areturn(Type.DOUBLE_TYPE);
             return;
         }
 
-        String cacheLikeField = context.newField(IFastCacheLike.class, this.cacheLike);
+        Class<?> cacheLikeType = this.cacheTraits.rebuilt() ? this.cacheLike.getClass() : IFastCacheLike.class;
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        String cacheLikeField = context.newField((Class) cacheLikeType, this.cacheLike);
         genPostprocessingMethod(context, cacheLikeField);
 
-        int cacheVar = localVarConsumer.createLocalVariable("cache", Type.getDescriptor(IFastCacheLike.class));
+        int cacheVar = localVarConsumer.createLocalVariable("cache", Type.getDescriptor(cacheLikeType));
         int eval = localVarConsumer.createLocalVariable("eval", Type.DOUBLE_TYPE.getDescriptor());
 
         m.load(0, InstructionAdapter.OBJECT_TYPE);
-        m.getfield(context.className, cacheLikeField, Type.getDescriptor(IFastCacheLike.class));
+        m.getfield(context.className, cacheLikeField, Type.getDescriptor(cacheLikeType));
         m.store(cacheVar, InstructionAdapter.OBJECT_TYPE);
 
         Label cacheMiss = new Label();
@@ -148,7 +149,11 @@ public class CacheLikeNode implements AstNode {
         m.load(2, Type.INT_TYPE);
         m.load(3, Type.INT_TYPE);
         m.load(4, InstructionAdapter.OBJECT_TYPE);
-        m.invokeinterface(Type.getInternalName(IFastCacheLike.class), "c2me$getCached", Type.getMethodDescriptor(Type.DOUBLE_TYPE, Type.INT_TYPE, Type.INT_TYPE, Type.INT_TYPE, Type.getType(EvalType.class)));
+        if (this.cacheTraits.rebuilt()) {
+            m.invokevirtual(Type.getInternalName(cacheLikeType), "c2me$getCached", Type.getMethodDescriptor(Type.DOUBLE_TYPE, Type.INT_TYPE, Type.INT_TYPE, Type.INT_TYPE, Type.getType(EvalType.class)), false);
+        } else {
+            m.invokeinterface(Type.getInternalName(IFastCacheLike.class), "c2me$getCached", Type.getMethodDescriptor(Type.DOUBLE_TYPE, Type.INT_TYPE, Type.INT_TYPE, Type.INT_TYPE, Type.getType(EvalType.class)));
+        }
         m.dup2(); // [D, D]
         m.dup2(); // [D, D, D]
         m.cmpg(Type.DOUBLE_TYPE);    // Density functions should NEVER compute a NaN // DCMP consumes two double, so [D, I]
@@ -175,16 +180,71 @@ public class CacheLikeNode implements AstNode {
         m.load(3, Type.INT_TYPE);
         m.load(4, InstructionAdapter.OBJECT_TYPE);
         m.load(eval, Type.DOUBLE_TYPE);
-        m.invokeinterface(Type.getInternalName(IFastCacheLike.class), "c2me$cache", Type.getMethodDescriptor(Type.VOID_TYPE, Type.INT_TYPE, Type.INT_TYPE, Type.INT_TYPE, Type.getType(EvalType.class), Type.DOUBLE_TYPE));
+        if (this.cacheTraits.rebuilt()) {
+            m.invokevirtual(Type.getInternalName(cacheLikeType), "c2me$cache", Type.getMethodDescriptor(Type.VOID_TYPE, Type.INT_TYPE, Type.INT_TYPE, Type.INT_TYPE, Type.getType(EvalType.class), Type.DOUBLE_TYPE), false);
+        } else {
+            m.invokeinterface(Type.getInternalName(IFastCacheLike.class), "c2me$cache", Type.getMethodDescriptor(Type.VOID_TYPE, Type.INT_TYPE, Type.INT_TYPE, Type.INT_TYPE, Type.getType(EvalType.class), Type.DOUBLE_TYPE));
+        }
 
         m.load(eval, Type.DOUBLE_TYPE);
         m.areturn(Type.DOUBLE_TYPE);
     }
 
+    private void doBytecodeGenSingleRebuilt2D(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
+        String positionField = context.newInternalField(long.class, "cache2d_position_xz", Long.MIN_VALUE);
+        String resultField = context.newInternalField(double.class, "cache2d_result");
+        int position = localVarConsumer.createLocalVariable("cache2dPosition", Type.LONG_TYPE.getDescriptor());
+        Label cacheHit = new Label();
+
+        genChunkPosLong(m);
+        m.store(position, Type.LONG_TYPE);
+
+        m.load(0, InstructionAdapter.OBJECT_TYPE);
+        m.getfield(context.className, positionField, Type.LONG_TYPE.getDescriptor());
+        m.load(position, Type.LONG_TYPE);
+        m.lcmp();
+        m.ifeq(cacheHit);
+
+        m.load(0, InstructionAdapter.OBJECT_TYPE);
+        m.load(position, Type.LONG_TYPE);
+        m.putfield(context.className, positionField, Type.LONG_TYPE.getDescriptor());
+
+        m.load(0, InstructionAdapter.OBJECT_TYPE);
+        AstNode.operandCallByteCodeGen(this.delegate, context, m, localVarConsumer);
+        m.putfield(context.className, resultField, Type.DOUBLE_TYPE.getDescriptor());
+
+        m.visitLabel(cacheHit);
+        m.load(0, InstructionAdapter.OBJECT_TYPE);
+        m.getfield(context.className, resultField, Type.DOUBLE_TYPE.getDescriptor());
+        m.areturn(Type.DOUBLE_TYPE);
+    }
+
+    private static void genChunkPosLong(InstructionAdapter m) {
+        m.load(1, Type.INT_TYPE);
+        m.visitInsn(Opcodes.I2L);
+        m.lconst(0xffffffffL);
+        m.visitInsn(Opcodes.LAND);
+        m.load(3, Type.INT_TYPE);
+        m.visitInsn(Opcodes.I2L);
+        m.lconst(0xffffffffL);
+        m.visitInsn(Opcodes.LAND);
+        m.iconst(32);
+        m.visitInsn(Opcodes.LSHL);
+        m.visitInsn(Opcodes.LOR);
+    }
+
     @Override
     public void doBytecodeGenMulti(BytecodeGen.Context context, InstructionAdapter m, BytecodeGen.Context.LocalVarConsumer localVarConsumer) {
         String delegateMethod = context.newMultiMethod(this.delegate);
-        String cacheLikeField = context.newField(IFastCacheLike.class, this.cacheLike);
+        if (this.cacheTraits.rebuilt() && !this.cacheTraits.supportsMultiCache()) {
+            context.callDelegateMulti(m, delegateMethod);
+            m.areturn(Type.VOID_TYPE);
+            return;
+        }
+
+        Class<?> cacheLikeType = this.cacheTraits.rebuilt() ? this.cacheLike.getClass() : IFastCacheLike.class;
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        String cacheLikeField = context.newField((Class) cacheLikeType, this.cacheLike);
 
         genPostprocessingMethod(context, cacheLikeField);
 
@@ -192,41 +252,48 @@ public class CacheLikeNode implements AstNode {
         Label cacheMiss = new Label();
 
         m.load(0, InstructionAdapter.OBJECT_TYPE);
-        m.getfield(context.className, cacheLikeField, Type.getDescriptor(IFastCacheLike.class));
+        m.getfield(context.className, cacheLikeField, Type.getDescriptor(cacheLikeType));
         m.ifnonnull(cacheExists);
         context.callDelegateMulti(m, delegateMethod);
         m.areturn(Type.VOID_TYPE);
 
         m.visitLabel(cacheExists);
         m.load(0, InstructionAdapter.OBJECT_TYPE);
-        m.getfield(context.className, cacheLikeField, Type.getDescriptor(IFastCacheLike.class));
+        m.getfield(context.className, cacheLikeField, Type.getDescriptor(cacheLikeType));
         m.load(1, InstructionAdapter.OBJECT_TYPE);
         m.load(2, InstructionAdapter.OBJECT_TYPE);
         m.load(3, InstructionAdapter.OBJECT_TYPE);
         m.load(4, InstructionAdapter.OBJECT_TYPE);
         m.load(5, InstructionAdapter.OBJECT_TYPE);
-        m.invokeinterface(Type.getInternalName(IFastCacheLike.class), "c2me$getCached", Type.getMethodDescriptor(Type.BOOLEAN_TYPE, Type.getType(double[].class), Type.getType(int[].class), Type.getType(int[].class), Type.getType(int[].class), Type.getType(EvalType.class)));
+        if (this.cacheTraits.rebuilt()) {
+            m.invokevirtual(Type.getInternalName(cacheLikeType), "c2me$getCached", Type.getMethodDescriptor(Type.BOOLEAN_TYPE, Type.getType(double[].class), Type.getType(int[].class), Type.getType(int[].class), Type.getType(int[].class), Type.getType(EvalType.class)), false);
+        } else {
+            m.invokeinterface(Type.getInternalName(IFastCacheLike.class), "c2me$getCached", Type.getMethodDescriptor(Type.BOOLEAN_TYPE, Type.getType(double[].class), Type.getType(int[].class), Type.getType(int[].class), Type.getType(int[].class), Type.getType(EvalType.class)));
+        }
         m.ifeq(cacheMiss);
         m.areturn(Type.VOID_TYPE);
 
         m.visitLabel(cacheMiss);
         context.callDelegateMulti(m, delegateMethod);
         m.load(0, InstructionAdapter.OBJECT_TYPE);
-        m.getfield(context.className, cacheLikeField, Type.getDescriptor(IFastCacheLike.class));
+        m.getfield(context.className, cacheLikeField, Type.getDescriptor(cacheLikeType));
         m.load(1, InstructionAdapter.OBJECT_TYPE);
         m.load(2, InstructionAdapter.OBJECT_TYPE);
         m.load(3, InstructionAdapter.OBJECT_TYPE);
         m.load(4, InstructionAdapter.OBJECT_TYPE);
         m.load(5, InstructionAdapter.OBJECT_TYPE);
-        m.invokeinterface(Type.getInternalName(IFastCacheLike.class), "c2me$cache", Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(double[].class), Type.getType(int[].class), Type.getType(int[].class), Type.getType(int[].class), Type.getType(EvalType.class)));
+        if (this.cacheTraits.rebuilt()) {
+            m.invokevirtual(Type.getInternalName(cacheLikeType), "c2me$cache", Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(double[].class), Type.getType(int[].class), Type.getType(int[].class), Type.getType(int[].class), Type.getType(EvalType.class)), false);
+        } else {
+            m.invokeinterface(Type.getInternalName(IFastCacheLike.class), "c2me$cache", Type.getMethodDescriptor(Type.VOID_TYPE, Type.getType(double[].class), Type.getType(int[].class), Type.getType(int[].class), Type.getType(int[].class), Type.getType(EvalType.class)));
+        }
         m.areturn(Type.VOID_TYPE);
     }
 
     private void genPostprocessingMethod(BytecodeGen.Context context, String cacheLikeField) {
-        if (!context.requiresPostProcessing()) {
+        if (this.cacheTraits.rebuilt()) {
             return;
         }
-
         String methodName = String.format("postProcessing_%s", cacheLikeField);
         String delegateSingle = context.newSingleMethod(this.delegate);
         String delegateMulti = context.newMultiMethod(this.delegate);
